@@ -268,10 +268,9 @@ def tabulate_data(filepath):
         params, res = data[i], data[i + 1]
         lr, decay_epoch, decay_rate, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride = params
 
+        print(res)
         # get the results values
-        avg_valid_loss = res['avg_valid_loss']
         avg_valid_acc = res['avg_valid_acc']
-        avg_train_loss = res['avg_train_loss']
         f1 = res['f1']
         # add a new row to the DataFrame
         df.loc[i // 2] = [avg_valid_acc, init_kernel_size, init_stride, lr, decay_epoch, decay_rate, rcc, rlf,

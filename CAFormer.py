@@ -5,6 +5,7 @@ import tqdm
 from colorlog import ColoredFormatter
 
 import torch.optim as optim
+from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
 from torch.utils.data import DataLoader
 from x_metaformer import CAFormer, CFFormer
 
@@ -95,6 +96,13 @@ def lr_decay(opt, epoch, hyperparameters):
     return opt
 
 
+def lr_lambda(epoch):
+    if epoch < EPOCHS * 0.1:
+        return epoch / (EPOCHS * 0.1)
+    else:
+        return 1.0
+
+
 def train_with_hyperparams(hyperparams, filepath):
     # Get all possible combinations of hyperparameters
     hyperparam_values = list(hyperparams.values())
@@ -107,10 +115,10 @@ def train_with_hyperparams(hyperparams, filepath):
             in_channels=1,
             depths=(3, 3, 9, 3),
             dims=(64, 128, 320, 512),
-            # init_kernel_size=combo[7],
-            init_kernel_size=3,
-            # init_stride=combo[8],
-            init_stride=2,
+            init_kernel_size=combo[7],
+            # init_kernel_size=3,
+            init_stride=combo[8],
+            # init_stride=2,
             drop_path_rate=0.5,
             norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
             use_dual_patchnorm=combo[5],  # norm on both sides for the patch embedding
@@ -139,22 +147,23 @@ def train_with_hyperparams(hyperparams, filepath):
         for key in last_five[0].keys():
             averages[key] = np.average([elem[key] for elem in last_five])
 
-        max_acc = get_max_acc(training_results)
+        max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
         log.info(f'Maximum Accuracy: {max_acc}')
 
-        # Append hyperparams and results to json file
-        if not os.path.exists(filepath):
-            with open(filepath, 'w+') as f:
-                json.dump([], f)
+        if SAVE_DATA:
+            # Append hyperparams and results to json file
+            if not os.path.exists(filepath):
+                with open(filepath, 'w+') as f:
+                    json.dump([], f)
 
-        with open(filepath, 'r') as file:
-            data = json.load(file)
+            with open(filepath, 'r') as file:
+                data = json.load(file)
 
-        data.append(combo)
-        data.append(averages)
+            data.append(combo)
+            data.append(averages)
 
-        with open(filepath, 'w') as f:
-            json.dump(data, f)
+            with open(filepath, 'w') as f:
+                json.dump(data, f)
 
         if CONF_MATRIX:
             log.info("Calculating Confusion Matrix")
@@ -172,6 +181,9 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, it
     train_losses = []
     valid_losses = []
     optimizer = optim.Adam(model.parameters(), lr=hyperparameters[0])
+    scheduler_warumup = LambdaLR(optimizer, lr_lambda)
+    scheduler_cos = CosineAnnealingLR(optimizer, T_max=0.9*EPOCHS)
+
     for epoch in (range(1, EPOCHS + 1)):
         epoch_id += 1
         log.info(f"Iteration {iteration[0]}/ {iteration[1]} - Epoch {epoch_id} / {EPOCHS}")
@@ -198,6 +210,10 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, it
             loss.backward()
             batch_losses.append(loss.item())
             optimizer.step()
+        if LR_WARUMUP and epoch_id < (EPOCHS / 10):
+            scheduler_warumup.step()
+        if COSINE and epoch_id > (EPOCHS / 10):
+            scheduler_cos.step()
         train_losses.append(batch_losses)
         train_loss = np.mean(train_losses[-1])
         # print(f'Epoch - {epoch} Train-Loss : {np.mean(train_losses[-1])}')
