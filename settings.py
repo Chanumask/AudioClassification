@@ -1,6 +1,6 @@
 HYPERPARAMS_SPEECH = {
     'learning_rate': [1e-4],
-    'decay_epoch': [40],  # every x epochs LR will be updated
+    'decay_epoch': [40, 40],  # every x epochs LR will be updated
     'decay_rate': [2],  # LR will be updated to LR / x
     'rrc': [True],  # RandomResizeCrop
     'rlf': [False],  # RandomLinearFade
@@ -44,9 +44,9 @@ CONF_MATRIX = False
 
 # Training Loop
 BATCH_SIZE = 16  # 32
-EPOCHS = 20
+EPOCHS = 120
 LR_SCHEDULING = True
-SAMPLE_RATE = 22050  # 16k
+SAMPLE_RATE = 22050
 
 # Dataset paths
 SPEECH_DATASET_PATH = "data/SpeechCommands"

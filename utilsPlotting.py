@@ -228,9 +228,11 @@ def plot_results(result_list):
     fig, ax = plt.subplots(4, figsize=(12, 10))
     plt.subplots_adjust(left=0.08, bottom=0.05, right=0.98, top=0.95, wspace=0.4, hspace=0.52)
 
+    label_distance = 5
+
     for i in range(len(ax)):
-        ax[i].set_xticks(range(0, EPOCHS))
-        ax[i].set_xticklabels([str(i + 1) for i in range(EPOCHS)])
+        ax[i].set_xticks(range(0, EPOCHS, label_distance))
+        ax[i].set_xticklabels(range(1, EPOCHS + 1, label_distance))
         ax[i].set_xlabel("Epochs")
 
     ax[0].set_ylabel("Accuracy")
@@ -238,27 +240,19 @@ def plot_results(result_list):
     ax[2].set_ylabel("Losses")
     ax[3].set_ylabel("Learning Rate")
 
-    ax[0].plot([res['avg_valid_acc'] for res in result_list], marker='o', color=colors[0])
-
     max_acc_value, max_acc_epoch = find_max_acc_epoch(result_list)
-
-    # max_acc = max([item.get('avg_valid_acc', 0) for item in result_list])
+    max_acc_value = round(max_acc_value * 100, 2)
+    ax[0].plot([res['avg_valid_acc'] for res in result_list], marker='o', color=colors[0])
     ax[0].axvline(x=max_acc_epoch, linestyle='dotted', color='black')
+    ax[0].text(x=(max_acc_epoch + 0.1), y=0.2, s=f'Max Accuracy: {max_acc_value}', rotation=90, size='x-small')
+    ax[0].set_ylim([0, 1])
     ax[1].plot([res['f1'] for res in result_list], marker='o', color=colors[1])
     ax[2].plot([res['avg_train_loss'] for res in result_list], marker='o', color=colors[3], label='Train Loss')
     ax[2].plot([res['avg_valid_loss'] for res in result_list], marker='^', color=colors[6], label='Valid Loss')
     ax[2].legend()
     ax[3].plot([res['lr'] for res in result_list], marker='o', color='k')
 
-    # ax[0].set_xticklabels([str(i + 1) for i in range(EPOCHS+1)])
     plt.savefig('plotted_results.png', dpi=300, bbox_inches="tight")
-
-    # xmax = result_list[np.argmax(y)]
-    # ax[i].plot()
-    # plt.axvline(x=7, color='b', label='axvline - full height')
-    # max acc Linie und schrift
-    #
-    # plt.plot(ypoints, marker = 'o', ms = 20)
 
 
 def tabulate_data(filepath):
@@ -267,7 +261,7 @@ def tabulate_data(filepath):
 
     df = pd.DataFrame(
         columns=["Accuracy", "init kernel size", "init stride", "LR", "LR Decay", "Decay rate", "RCC", "RLF", "dual pn",
-                 "Mixup", "Avg VL", "Avg TL", "f1"])
+                 "Mixup", "f1"])
 
     # iterate over data
     for i in range(0, len(data), 2):
@@ -281,7 +275,7 @@ def tabulate_data(filepath):
         f1 = res['f1']
         # add a new row to the DataFrame
         df.loc[i // 2] = [avg_valid_acc, init_kernel_size, init_stride, lr, decay_epoch, decay_rate, rcc, rlf,
-                          dual_patchnorm, mixup, avg_valid_loss, avg_train_loss, f1]
+                          dual_patchnorm, mixup, f1]
 
     # sort the rows based on the 'Avg Valid Acc' column
     df = df.sort_values(by=['Accuracy'], ascending=False)
