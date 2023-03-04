@@ -109,7 +109,6 @@ def train_with_hyperparams(hyperparams, filepath):
     hyperparam_combinations = list(product(*hyperparam_values))
     log.info(f"Generated {len(hyperparam_combinations)} possible hyperparameter combinations.")
     # Train model with each combination of hyperparameters and save results
-    averages = {}
     for i, combo in enumerate(hyperparam_combinations):
         my_metaformer = CAFormer(
             in_channels=1,
@@ -142,11 +141,6 @@ def train_with_hyperparams(hyperparams, filepath):
         training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo, num_classes,
                                  iteration=[i + 1, len(hyperparam_combinations)])
 
-        # calculate the average of the last 5 values for each key
-        last_five = training_results[-5:]
-        for key in last_five[0].keys():
-            averages[key] = np.average([elem[key] for elem in last_five])
-
         max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
         log.info(f'Maximum Accuracy: {max_acc}')
 
@@ -160,7 +154,7 @@ def train_with_hyperparams(hyperparams, filepath):
                 data = json.load(file)
 
             data.append(combo)
-            data.append(averages)
+            data.append(max_acc)
 
             with open(filepath, 'w') as f:
                 json.dump(data, f)
@@ -182,7 +176,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, it
     valid_losses = []
     optimizer = optim.Adam(model.parameters(), lr=hyperparameters[0])
     scheduler_warumup = LambdaLR(optimizer, lr_lambda)
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=0.9*EPOCHS)
+    scheduler_cos = CosineAnnealingLR(optimizer, T_max=1.2*EPOCHS)
 
     for epoch in (range(1, EPOCHS + 1)):
         epoch_id += 1
@@ -259,7 +253,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, it
 
 if __name__ == "__main__":
     if ONLY_TABULATE:
-        filename = f"results//results_{DATASET}.json"
+        filename = f"results//results_{DATASET}_new.json"
         utilsPlotting.tabulate_data(filename)
         quit()
 
@@ -286,7 +280,7 @@ if __name__ == "__main__":
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, g)
     criterion = nn.CrossEntropyLoss()
 
-    filename = f"results//results_{DATASET}.json"
+    filename = f"results//results_{DATASET}_new.json"
     train_with_hyperparams(current_hyperparams, filename)
 
     # CAmodel = CAFormer(

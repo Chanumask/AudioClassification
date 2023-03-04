@@ -1,6 +1,6 @@
 HYPERPARAMS_SPEECH = {
     'learning_rate': [1e-4],
-    'decay_epoch': [40],  # every x epochs LR will be updated
+    'decay_epoch': [40, 40, 40, 40, 40, 40, 40, 40, 40, 40],  # every x epochs LR will be updated
     'decay_rate': [2],  # LR will be updated to LR / x
     'rrc': [True],  # RandomResizeCrop
     'rlf': [False],  # RandomLinearFade
@@ -36,7 +36,7 @@ HYPERPARAMS_MUSIC = {
 
 # General
 DATASET = "SPEECH"  # "SPEECH", "ESC50", "MUSIC"
-SAVE_DATA= False
+SAVE_DATA = True
 PLOT_RES = True
 MONITORING = False
 UPDATE_INTERVAL = 1  # every x Epochs
@@ -45,7 +45,7 @@ CONF_MATRIX = False
 
 # Training Loop
 BATCH_SIZE = 16  # 32
-EPOCHS = 2
+EPOCHS = 120
 LR_SCHEDULING = False
 LR_WARUMUP = True
 COSINE = True
