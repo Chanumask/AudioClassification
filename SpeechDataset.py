@@ -68,22 +68,22 @@ def split_speech_dataset(data_path, test_size=0.2, validation_size=0.2):
         i = i.split("\\", 1)[1]
         categories.append(i)
     # create train, validation, test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
-    X_train, X_validation, y_train, y_validation = train_test_split(X_train, y_train, test_size=validation_size)
+    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+    x_train, x_validation, y_train, y_validation = train_test_split(x_train, y_train, test_size=validation_size)
 
-    return X_train, y_train, X_validation, y_validation, X_test, y_test, categories
+    return x_train, y_train, x_validation, y_validation, x_test, y_test, categories
 
 
 class SpeechDataset(Dataset):
-    def __init__(self, mode, X, y, categories, mixup):
+    def __init__(self, mode, x, y, categories, mixup):
         self.data = []
         self.labels = y
         self.c2i = {}
         self.i2c = {}
         self.mode = mode
         self.categories = categories
-        for ind in tqdm(range(len(X)), desc=self.mode + ' dataset', ncols=37):
-            file_path = X[ind]
+        for ind in tqdm(range(len(x)), desc=self.mode + ' dataset', ncols=37):
+            file_path = x[ind]
             audio = AudioUtil.open(file_path)
             audio = AudioUtil.resample(audio, SAMPLE_RATE)
             audio = AudioUtil.rechannel(audio, 1)

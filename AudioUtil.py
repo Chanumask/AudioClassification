@@ -89,12 +89,6 @@ class AudioUtil:
         signal, sr = aud
         top_db = TOPDB
 
-        # ADD GAUSSIAN NOISE
-        # if NOISE_INJECT:
-        #     gaussian_noise = torch.zeros(signal.shape, dtype=torch.float)
-        #     gaussian_noise = gaussian_noise + (0.1 ** 0.5) * torch.randn(signal.shape)
-        #     signal = signal + gaussian_noise
-
         # spec has shape [channel, n_mels, time], where channel is mono, stereo etc
         spec = t.MelSpectrogram(sr, n_fft=n_fft, hop_length=hop_len, n_mels=n_mels)(signal)
 
@@ -107,7 +101,14 @@ class AudioUtil:
         #     spec = t.FrequencyMasking(2)(spec)
 
         # Convert to decibels
+        # spec = (transforms.AmplitudeToDB(top_db=top_db, stype="power")(spec) + 40) / 40
         spec = transforms.AmplitudeToDB(top_db=top_db)(spec)
+
+        # a2b = transforms.AmplitudeToDB(top_db=top_db, stype="power")
+        # spec = a2b(spec)
+        # print(a2b.)
+        # print(spec.min(), spec.max(), spec.mean())
+
         return spec
 
 

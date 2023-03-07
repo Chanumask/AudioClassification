@@ -1,13 +1,13 @@
 import logging
 import time
-from itertools import cycle, product
+from itertools import product
 import tqdm
 from colorlog import ColoredFormatter
 
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
 from torch.utils.data import DataLoader
-from x_metaformer import CAFormer, CFFormer
+from x_metaformer import CAFormer
 
 import utilsPlotting
 from ESC50Dataset import ESC50Data
@@ -103,6 +103,16 @@ def lr_lambda(epoch):
         return 1.0
 
 
+class BNMetaFormer(CAFormer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bn = nn.BatchNorm2d(1, affine=False)   #
+
+    def forward(self, x, return_embeddings=False):
+        x = self.bn(x)
+        return super().forward(x, return_embeddings)
+
+
 def train_with_hyperparams(hyperparams, filepath):
     # Get all possible combinations of hyperparameters
     hyperparam_values = list(hyperparams.values())
@@ -113,23 +123,23 @@ def train_with_hyperparams(hyperparams, filepath):
         my_metaformer = CAFormer(
             in_channels=1,
             depths=(3, 3, 9, 3),
-            dims=(64, 128, 320, 512),
-            init_kernel_size=combo[7],
-            # init_kernel_size=3,
-            init_stride=combo[8],
-            # init_stride=2,
-            drop_path_rate=0.5,
+            dims=(64, 128, 320, 512),  # 32-256
+            # init_kernel_size=combo[7],
+            init_kernel_size=(8, 4),
+            # init_stride=combo[8],
+            init_stride=(4, 2),
+            drop_path_rate=0.5,  # 0.25
             norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
             use_dual_patchnorm=combo[5],  # norm on both sides for the patch embedding
             use_pos_emb=True,  # use 2d sinusodial positional embeddings
-            head_dim=32,
-            num_heads=4,
-            attn_dropout=0.1,
-            proj_dropout=0.1,
+            head_dim=32,  # 16
+            num_heads=4,  # 2,8
+            attn_dropout=0.1,  # 0, 0.2
+            proj_dropout=0.1,  # 0
             patchmasking_prob=0,  # replace 5% of the initial tokens with a </mask> token
             scale_value=1.0,  # scale attention logits by this value
             trainable_scale=False,  # if scale can be trained
-            num_mem_vecs=0,  # additional memory vectors (in the attention layers)
+            num_mem_vecs=0,  # additional memory vectors (in the attention layers)  # 16,32
             sparse_topk=0,  # sparsify - keep only top k values (in the attention layers)
             l2=False,  # l2 norm on tokens (in the attention layers)
             improve_locality=False,  # remove attention on own token
@@ -170,47 +180,40 @@ def train_with_hyperparams(hyperparams, filepath):
 def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, iteration):
     start_time = time.time()
 
-    epoch_id = 0
     res_array = []
     train_losses = []
     valid_losses = []
     optimizer = optim.Adam(model.parameters(), lr=hyperparameters[0])
     scheduler_warumup = LambdaLR(optimizer, lr_lambda)
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=1.2*EPOCHS)
+    scheduler_cos = CosineAnnealingLR(optimizer, T_max=1.2 * EPOCHS)
 
     for epoch in (range(1, EPOCHS + 1)):
-        epoch_id += 1
-        log.info(f"Iteration {iteration[0]}/ {iteration[1]} - Epoch {epoch_id} / {EPOCHS}")
+        log.info(f"Iteration {iteration[0]}/ {iteration[1]} - Epoch {epoch} / {EPOCHS}")
         model.train()
         batch_losses = []
-        if LR_SCHEDULING and epoch % hyperparameters[1] == 0:  # hyperparameters[1] = decay_epoch
-            optimizer = lr_decay(optimizer, epoch, hyperparameters)
 
         for i, data in tqdm(enumerate(train_loader), desc='Epoch progress', ncols=33):
             x, y = data
-            # if RANDOM_RESIZE_CROP:
-            if hyperparameters[3]:
+            if hyperparameters[3]:  # RANDOM_RESIZE_CROP
                 resize_cropper = RandomResizeCrop()
                 x = resize_cropper(x)
-            # if RANDOM_LINEAR_FADE:
-            if hyperparameters[4]:
+            if hyperparameters[4]:  # RANDOM_LINEAR_FADE
                 linear_fader = RandomLinearFader()
                 x = linear_fader(x)
             optimizer.zero_grad()
             x = x.to(device, dtype=torch.float32)
             y = y.to(device, dtype=torch.long)
             y_hat = model(x)
-            loss = loss_fn(y_hat, y)  # y.float() for mixup?
+            loss = loss_fn(y_hat, y)
             loss.backward()
             batch_losses.append(loss.item())
             optimizer.step()
-        if LR_WARUMUP and epoch_id < (EPOCHS / 10):
+        if LR_WARUMUP and epoch < (EPOCHS / 10):  # /20
             scheduler_warumup.step()
-        if COSINE and epoch_id > (EPOCHS / 10):
+        if COSINE and epoch > (EPOCHS / 10):
             scheduler_cos.step()
         train_losses.append(batch_losses)
         train_loss = np.mean(train_losses[-1])
-        # print(f'Epoch - {epoch} Train-Loss : {np.mean(train_losses[-1])}')
         model.eval()
         # y_pred = []
         # y_true = []
@@ -239,15 +242,16 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, it
         res_array.append(
             {'avg_valid_loss': valid_loss, 'avg_valid_acc': accuracy, 'avg_train_loss': train_loss,
              'lr': np.average(lrs), 'f1': f1})
-        if MONITORING and epoch_id % UPDATE_INTERVAL == 0 and epoch_id != EPOCHS:
-            # print(result_array[epoch_id-1])
+        if MONITORING and epoch % UPDATE_INTERVAL == 0 and epoch != EPOCHS:
             utilsPlotting.liveplot(res_array,
                                    [{"Accuracies vs epochs": ['avg_valid_acc']}, {"f1_score vs epochs": ['f1']},
                                     {"Train Losses vs epochs": ['avg_train_loss']},
                                     {"Valid Losses vs epochs": ['avg_valid_loss']},
                                     {"Learning rates per batch vs epochs": ['lr']}], epoch=EPOCHS)
-        # print(f'Epoch - {epoch} Valid-Loss : {valid_loss} Valid-Accuracy : {accuracy}')
-    log.info(f"Training duration: {(time.time() - start_time)} seconds")
+    seconds = (time.time() - start_time)
+    minutes = int(seconds // 60)
+    remaining_seconds = int(round(seconds % 60, 0))
+    log.info(f"Training duration: {minutes} minutes and {remaining_seconds} seconds")
     return res_array
 
 
@@ -261,9 +265,6 @@ if __name__ == "__main__":
     log = initiate_logging()
     log.info(f'Loading and preprocessing {DATASET} datasets...')
 
-    # plot_example()
-    # plt.show()
-    # quit()
     train_data, valid_data, num_classes = get_data(current_hyperparams['mixup'][0])
 
     train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
@@ -276,8 +277,6 @@ if __name__ == "__main__":
 
     log.info(f"selected device: {device}")
 
-    # optimizer = optim.Adam(my_metaformer.parameters(), lr=LEARNING_RATE)
-    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, g)
     criterion = nn.CrossEntropyLoss()
 
     filename = f"results//results_{DATASET}_new.json"
