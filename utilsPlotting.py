@@ -260,19 +260,19 @@ def tabulate_data(filepath):
         data = json.load(f)
 
     df = pd.DataFrame(
-        columns=["Max accuracy", "kernel size", "stride", "RCC", "RLF", "patchnorm", "Mixup"])
+        columns=["Max acc", "seed", "kernel", "stride", "RCC", "RLF", "pn", "Mixup", "wd"])
 
     # iterate over data
-    for i in range(0, len(data), 2):
-        params, acc = data[i], data[i + 1]
-        lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride = params
+    for i in range(0, len(data), 3):
+        params, acc, seed = data[i], data[i + 1], data[i+2]
+        lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay = params
 
         # get the results values
         # add a new row to the DataFrame
-        df.loc[i // 2] = [acc, init_kernel_size, init_stride, rcc, rlf, dual_patchnorm, mixup]
+        df.loc[i // 2] = [acc, seed, init_kernel_size, init_stride, rcc, rlf, dual_patchnorm, mixup, weight_decay]
 
     # sort the rows based on the 'Avg Valid Acc' column
-    df = df.sort_values(by=['Max accuracy'], ascending=False)
+    df = df.sort_values(by=['Max acc'], ascending=False)
 
     # Set option to display all columns
     pd.set_option('display.max_columns', None)

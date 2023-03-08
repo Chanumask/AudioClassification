@@ -8,6 +8,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
 from torch.utils.data import DataLoader
 from x_metaformer import CAFormer
+import pytorch_lightning as pl
 
 import utilsPlotting
 from ESC50Dataset import ESC50Data
@@ -18,7 +19,8 @@ from metrics import *
 
 
 # SETTINGS
-def settings():
+def setup_parameters():
+    pl.seed_everything(RNG_SEED)
     if DATASET == "SPEECH":
         current_hypers = HYPERPARAMS_SPEECH
     elif DATASET == "MUSIC":
@@ -81,19 +83,22 @@ def get_data(mixup):
     return train_data, valid_data, num_classes
 
 
-def setlr(opt, lr):
-    for param_group in opt.param_groups:
-        param_group['lr'] = lr
-    return opt
+def exclude_from_wt_decay(named_params, weight_decay, skip_list):
+    params = []
+    excluded_params = []
 
-
-def lr_decay(opt, epoch, hyperparameters):
-    # new_lr = LEARNING_RATE / (10 ** (epoch // LRDECAY_EPOCH))
-    current_learning_rate = opt.param_groups[0]["lr"]
-    new_lr = current_learning_rate / hyperparameters[2]
-    opt = setlr(opt, new_lr)
-    log.info(f'Changed learning rate to {new_lr}')
-    return opt
+    for name, param in named_params:
+        if not param.requires_grad:
+            continue
+        if any(layer_name in name for layer_name in skip_list):
+            excluded_params.append(param)
+            # print(f"skipped param {name}")
+        else:
+            params.append(param)
+    return [
+        {"params": params, "weight_decay": weight_decay},
+        {"params": excluded_params, "weight_decay": 0.0},
+    ]
 
 
 def lr_lambda(epoch):
@@ -106,7 +111,7 @@ def lr_lambda(epoch):
 class BNMetaFormer(CAFormer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bn = nn.BatchNorm2d(1, affine=False)   #
+        self.bn = nn.BatchNorm2d(1, affine=False)  #
 
     def forward(self, x, return_embeddings=False):
         x = self.bn(x)
@@ -124,13 +129,13 @@ def train_with_hyperparams(hyperparams, filepath):
             in_channels=1,
             depths=(3, 3, 9, 3),
             dims=(64, 128, 320, 512),  # 32-256
-            # init_kernel_size=combo[7],
-            init_kernel_size=(8, 4),
-            # init_stride=combo[8],
-            init_stride=(4, 2),
+            init_kernel_size=combo[5],
+            # init_kernel_size=(8, 4),
+            init_stride=combo[6],
+            # init_stride=(4, 2),
             drop_path_rate=0.5,  # 0.25
             norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
-            use_dual_patchnorm=combo[5],  # norm on both sides for the patch embedding
+            use_dual_patchnorm=combo[3],  # norm on both sides for the patch embedding
             use_pos_emb=True,  # use 2d sinusodial positional embeddings
             head_dim=32,  # 16
             num_heads=4,  # 2,8
@@ -143,12 +148,13 @@ def train_with_hyperparams(hyperparams, filepath):
             sparse_topk=0,  # sparsify - keep only top k values (in the attention layers)
             l2=False,  # l2 norm on tokens (in the attention layers)
             improve_locality=False,  # remove attention on own token
-            use_starreglu=False  # use gated StarReLU
+            use_starreglu=False,  # use gated StarReLU
+            use_seqpool=True
         )
         my_metaformer = my_metaformer.to(device)
         log.info(f"Training Cycle {i + 1} of {len(hyperparam_combinations)}")
 
-        training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo, num_classes,
+        training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo,
                                  iteration=[i + 1, len(hyperparam_combinations)])
 
         max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
@@ -165,9 +171,18 @@ def train_with_hyperparams(hyperparams, filepath):
 
             data.append(combo)
             data.append(max_acc)
+            data.append(RNG_SEED)
 
             with open(filepath, 'w') as f:
                 json.dump(data, f)
+
+        if SAVE_MAX_MODEL:
+            with open('highest_acc.txt', 'r') as f:
+                current_max_acc = float(f.read())
+            if max_acc > current_max_acc:
+                with open('highest_acc.txt', 'w') as f:
+                    f.write(str(max_acc))
+                torch.save(my_metaformer, 'my_transformer_model.pt')
 
         if CONF_MATRIX:
             log.info("Calculating Confusion Matrix")
@@ -177,13 +192,18 @@ def train_with_hyperparams(hyperparams, filepath):
             utilsPlotting.plot_results(training_results)
 
 
-def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, iteration):
+def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
     start_time = time.time()
 
     res_array = []
     train_losses = []
     valid_losses = []
-    optimizer = optim.Adam(model.parameters(), lr=hyperparameters[0])
+    params = exclude_from_wt_decay(
+        model.named_parameters(),
+        hyperparameters[7],
+        ["temp", "temperature", "scale", "norm"],
+    )
+    optimizer = optim.AdamW(params, lr=hyperparameters[0], weight_decay=hyperparameters[7])
     scheduler_warumup = LambdaLR(optimizer, lr_lambda)
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=1.2 * EPOCHS)
 
@@ -194,10 +214,10 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, it
 
         for i, data in tqdm(enumerate(train_loader), desc='Epoch progress', ncols=33):
             x, y = data
-            if hyperparameters[3]:  # RANDOM_RESIZE_CROP
+            if hyperparameters[1]:  # RANDOM_RESIZE_CROP
                 resize_cropper = RandomResizeCrop()
                 x = resize_cropper(x)
-            if hyperparameters[4]:  # RANDOM_LINEAR_FADE
+            if hyperparameters[2]:  # RANDOM_LINEAR_FADE
                 linear_fader = RandomLinearFader()
                 x = linear_fader(x)
             optimizer.zero_grad()
@@ -257,11 +277,11 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, classes, it
 
 if __name__ == "__main__":
     if ONLY_TABULATE:
-        filename = f"results//results_{DATASET}_new.json"
+        filename = f"results//results_{DATASET}0703.json"
         utilsPlotting.tabulate_data(filename)
         quit()
 
-    current_hyperparams = settings()
+    current_hyperparams = setup_parameters()
     log = initiate_logging()
     log.info(f'Loading and preprocessing {DATASET} datasets...')
 
@@ -279,7 +299,7 @@ if __name__ == "__main__":
 
     criterion = nn.CrossEntropyLoss()
 
-    filename = f"results//results_{DATASET}_new.json"
+    filename = f"results//results_{DATASET}0703.json"
     train_with_hyperparams(current_hyperparams, filename)
 
     # CAmodel = CAFormer(
