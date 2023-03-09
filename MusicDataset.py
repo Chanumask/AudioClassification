@@ -70,15 +70,17 @@ def split_music_dataset(data_path, test_size=0.2, validation_size=0.2):
 
 
 class MusicDataset(Dataset):
-    def __init__(self, mode, X, y, categories, mixup):
+    def __init__(self, mode, x, y, categories, mixup):
         self.data = []
         self.labels = y
         self.c2i = {}
         self.i2c = {}
         self.mode = mode
         self.categories = categories
-        for ind in tqdm(range(len(X)), desc=self.mode + ' dataset', ncols=37):
-            file_path = X[ind]
+        self.mean = 0
+        self.std = 0
+        for ind in tqdm(range(len(x)), desc=self.mode + ' dataset', ncols=37):
+            file_path = x[ind]
             audio = AudioUtil.open(file_path)
             audio = AudioUtil.resample(audio, SAMPLE_RATE)
             audio = AudioUtil.rechannel(audio, 1)
@@ -88,10 +90,17 @@ class MusicDataset(Dataset):
                 mixer = MixupBYOLA(ratio=0.2, log_mixup_exp=True)
                 sgram = mixer(sgram)
             self.data.append(sgram)
+            self.mean += sgram.mean()
+            self.std += sgram.std()
+
+        self.mean /= len(x)
+        self.std /= len(x)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # print(self.data[idx].shape)  # (1, 128, 431)
-        return self.data[idx], self.labels[idx]
+        # normalize spectrogram using dataset mean and stddev
+        sgram = self.data[idx]
+        sgram = (sgram - self.mean) / self.std
+        return sgram, self.labels[idx]

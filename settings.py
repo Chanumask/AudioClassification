@@ -16,22 +16,24 @@ HYPERPARAMS_ESC50 = {
     'dual_patchnorm': [True],
     'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [3],
-    'init_stride': [2]
+    'init_stride': [2],
+    'weight_decay': [1e-3]
 }
 
 HYPERPARAMS_MUSIC = {
-    'learning_rate': [1e-4, 1e-4, 1e-4, 1e-4, 1e-4],
+    'learning_rate': [1e-4],
     'rrc': [True],  # RandomResizeCrop
     'rlf': [True],  # RandomLinearFade
     'dual_patchnorm': [False],
     'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [(3, 3)],
-    'init_stride': [(2, 2)]
+    'init_stride': [(2, 2)],
+    'weight_decay': [1e-1, 1e-2, 1e-3]
 }
 
 # General
-DATASET = "SPEECH"  # "SPEECH", "ESC50", "MUSIC"
-RNG_SEED = 2
+DATASET = "ESC50"  # "SPEECH", "ESC50", "MUSIC"
+RNG_SEED = 1
 
 ONLY_TABULATE = False
 SAVE_DATA = True

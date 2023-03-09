@@ -9,6 +9,7 @@ from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
 from torch.utils.data import DataLoader
 from x_metaformer import CAFormer
 import pytorch_lightning as pl
+from ema_pytorch import EMA
 
 import utilsPlotting
 from ESC50Dataset import ESC50Data
@@ -177,12 +178,12 @@ def train_with_hyperparams(hyperparams, filepath):
                 json.dump(data, f)
 
         if SAVE_MAX_MODEL:
-            with open('highest_acc.txt', 'r') as f:
+            max_acc = 0.88
+            with open(f'highest_acc_{DATASET}.txt', 'r+') as f:
                 current_max_acc = float(f.read())
-            if max_acc > current_max_acc:
-                with open('highest_acc.txt', 'w') as f:
+                if max_acc > current_max_acc:
+                    f.seek(0)
                     f.write(str(max_acc))
-                torch.save(my_metaformer, 'my_transformer_model.pt')
 
         if CONF_MATRIX:
             log.info("Calculating Confusion Matrix")
