@@ -37,7 +37,7 @@ def conf_matrix(model, loader, data):
                          columns=[i for i in classes])
     plt.figure(figsize=(20, 14))
     sns.heatmap(df_cm, annot=True)
-    plt.savefig('confusion_matrix.png')
+    plt.savefig('results/confusion_matrix.png')
 
 
 def f1score(model, loader):
