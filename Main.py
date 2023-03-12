@@ -11,7 +11,7 @@ from x_metaformer import CAFormer
 import pytorch_lightning as pl
 from ema_pytorch import EMA
 
-import utilsPlotting
+import plotting
 from ESC50Dataset import ESC50Data
 from MusicDataset import split_music_dataset, MusicDataset
 from SpeechDataset import *
@@ -134,15 +134,15 @@ def train_with_hyperparams(hyperparams, filepath):
             # init_kernel_size=(8, 4),
             init_stride=combo[6],
             # init_stride=(4, 2),
-            drop_path_rate=0.5,  # 0.25
+            drop_path_rate=0.5,  # 0, 0.25 worse
             norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
             use_dual_patchnorm=combo[3],  # norm on both sides for the patch embedding
             use_pos_emb=True,  # use 2d sinusodial positional embeddings
-            head_dim=32,  # 16
-            num_heads=4,  # 2,8
-            attn_dropout=0.1,  # 0, 0.2
-            proj_dropout=0.1,  # 0
-            patchmasking_prob=0,  # replace 5% of the initial tokens with a </mask> token
+            head_dim=32,
+            num_heads=8,
+            attn_dropout=0.1,  # 0, 0.1, 0.2 no diff
+            proj_dropout=0.1,  # 0, 0.1 no diff
+            patchmasking_prob=0,  # worse: 0.05 replace 5% of the initial tokens with a </mask> token
             scale_value=1.0,  # scale attention logits by this value
             trainable_scale=False,  # if scale can be trained
             num_mem_vecs=0,  # additional memory vectors (in the attention layers)  # 16,32
@@ -194,7 +194,7 @@ def train_with_hyperparams(hyperparams, filepath):
             conf_matrix(my_metaformer, valid_loader, valid_data)
 
         if PLOT_RES:
-            utilsPlotting.plot_results(training_results)
+            plotting.plot_results(training_results)
 
 
 def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
@@ -272,7 +272,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
             {'avg_valid_loss': valid_loss, 'avg_valid_acc': accuracy, 'avg_train_loss': train_loss,
              'lr': np.average(lrs), 'f1': f1})
         if MONITORING and epoch % UPDATE_INTERVAL == 0 and epoch != EPOCHS:
-            utilsPlotting.liveplot(res_array,
+            plotting.liveplot(res_array,
                                    [{"Accuracies vs epochs": ['avg_valid_acc']}, {"f1_score vs epochs": ['f1']},
                                     {"Train Losses vs epochs": ['avg_train_loss']},
                                     {"Valid Losses vs epochs": ['avg_valid_loss']},
@@ -286,8 +286,8 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
 
 if __name__ == "__main__":
     if ONLY_TABULATE:
-        filename = f"results//results_{DATASET}0703.json"
-        utilsPlotting.tabulate_data(filename)
+        filename = f"results//results_{DATASET}.json"
+        plotting.tabulate_data(filename)
         quit()
 
     current_hyperparams = setup_parameters()
@@ -308,7 +308,7 @@ if __name__ == "__main__":
 
     criterion = nn.CrossEntropyLoss()
 
-    filename = f"results//results_{DATASET}0703.json"
+    filename = f"results//results_{DATASET}.json"
     train_with_hyperparams(current_hyperparams, filename)
 
     # CAmodel = CAFormer(

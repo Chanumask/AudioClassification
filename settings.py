@@ -6,7 +6,8 @@ HYPERPARAMS_SPEECH = {
     'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [(8, 4)],
     'init_stride': [(4, 2)],
-    'weight_decay': [1e-2]
+    'weight_decay': [1e-2],
+    'comment': [""]
 }
 
 HYPERPARAMS_ESC50 = {
@@ -17,7 +18,8 @@ HYPERPARAMS_ESC50 = {
     'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [3],
     'init_stride': [2],
-    'weight_decay': [1e-3]
+    'weight_decay': [1e-3],
+    'comment': ["300 Epochs"]
 }
 
 HYPERPARAMS_MUSIC = {
@@ -28,25 +30,25 @@ HYPERPARAMS_MUSIC = {
     'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [(3, 3)],
     'init_stride': [(2, 2)],
-    'weight_decay': [1e-1, 1e-2, 1e-3]
+    'weight_decay': [1e-3],
+    'comment': ["300 Epochs"]
 }
 
 # General
-DATASET = "SPEECH"  # "SPEECH", "ESC50", "MUSIC"
-RNG_SEED = 2  # 2, 1, 1
+DATASET = "MUSIC"  # "SPEECH", "ESC50", "MUSIC"
+RNG_SEED = 1  # 2, 1, 1
 
 ONLY_TABULATE = False
-SAVE_DATA = False
+SAVE_DATA = True
 SAVE_MAX_MODEL = True
 PLOT_RES = True
 MONITORING = False
 UPDATE_INTERVAL = 5  # every x Epochs
 CONF_MATRIX = True
 
-
 # Training Loop
 BATCH_SIZE = 16  # 32, 64
-EPOCHS = 120
+EPOCHS = 300
 LR_WARUMUP = True
 COSINE = True
 EMA_ON = False

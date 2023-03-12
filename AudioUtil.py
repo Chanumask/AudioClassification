@@ -154,27 +154,6 @@ class RandomResizeCrop(nn.Module):
         return torch.cat([torch.jit.wait(fut) for fut in crop_futures], 0)
 
 
-class Mixup(nn.Module):
-    def __init__(self, alpha, num_classes):
-        super(Mixup, self).__init__()
-        self.alpha = alpha
-        self.num_classes = num_classes
-        self.beta_dist = Uniform(alpha, 1)  # if uniform use values from 0.5 upwards or Beta(alpha, alpa)
-
-    @classmethod
-    def mix(cls, data: torch.Tensor, gamma, indices: torch.Tensor) -> torch.Tensor:
-        assert data.shape[0] == indices.shape[0], 'Requires same number of samples'
-        gamma_ = gamma.view(gamma.shape[0], *(1 for _ in range(len(data.shape) - 1)))
-        return data * gamma_ + (1.0 - gamma_) * data[indices]
-
-    def forward(self, data, labels):
-        gamma = self.beta_dist.sample((data.shape[0],))
-        indices = torch.randperm(data.size(0), device=data.device, dtype=torch.long)
-        one_hot_labels = F.one_hot(labels, num_classes=self.num_classes) if len(labels.shape) <= 1 else labels
-        mixedup_data, mixedup_labels = self.mix(data, gamma, indices), self.mix(one_hot_labels, gamma, indices)
-        return mixedup_data, mixedup_labels
-
-
 def log_mixup_exp(xa, xb, alpha):
     xa = xa.exp()
     xb = xb.exp()
@@ -235,17 +214,3 @@ class RandomLinearFader(nn.Module):
     def __repr__(self):
         format_string = self.__class__.__name__ + f'(gain={self.gain})'
         return format_string
-
-
-class PatchMerger(nn.Module):
-    def __init__(self, dim, num_tokens_out):
-        super().__init__()
-        self.scale = dim ** -0.5
-        self.norm = nn.LayerNorm(dim)
-        self.queries = nn.Parameter(torch.randn(num_tokens_out, dim))
-
-    def forward(self, x):
-        x = self.norm(x)
-        sim = torch.matmul(self.queries, x.transpose(-1, -2)) * self.scale
-        attn = sim.softmax(dim=-1)
-        return torch.matmul(attn, x)
