@@ -17,24 +17,20 @@ def conf_matrix(model, loader, data):
     for inputs, labels in loader:
         output = model(inputs.to(device))  # Feed Network
 
-        output = (torch.max(torch.exp(output), 1)[1]).data.cpu().numpy()
-        y_pred.extend(output)  # Save Prediction
+        for i in range(len(output)):
+            pred_label = torch.max(torch.exp(output[i]), 0)[1].item()  # Get predicted label
+            y_pred.append(pred_label)  # Save Prediction
 
-        labels = labels.data.cpu().numpy()
-        y_true.extend(labels)  # Save Truth
+            true_label = labels[i].item()  # Get true label
+            y_true.append(true_label)  # Save Truth
 
-    # constant for classes
     classes = data.categories
-    # print(len(classes))
-
-    # Flatten y_true and y_pred
-    y_true = np.ravel(y_true)
-    y_pred = np.ravel(y_pred)
 
     # Build confusion matrix
     cf_matrix = confusion_matrix(y_true, y_pred)
     df_cm = pd.DataFrame(cf_matrix, index=[i for i in classes],
                          columns=[i for i in classes])
+    print(f"sum_of_values = {df_cm.values.sum()}")
     plt.figure(figsize=(20, 14))
     sns.heatmap(df_cm, annot=True)
     plt.savefig('results/confusion_matrix.png')

@@ -1,6 +1,8 @@
 import logging
 import time
 from itertools import product
+
+import timm
 import tqdm
 from colorlog import ColoredFormatter
 
@@ -126,33 +128,38 @@ def train_with_hyperparams(hyperparams, filepath):
     log.info(f"Generated {len(hyperparam_combinations)} possible hyperparameter combinations.")
     # Train model with each combination of hyperparameters and save results
     for i, combo in enumerate(hyperparam_combinations):
-        my_metaformer = CAFormer(
-            in_channels=1,
-            depths=(3, 3, 9, 3),
-            dims=(64, 128, 320, 512),  # 32-256
-            init_kernel_size=combo[5],
-            # init_kernel_size=(8, 4),
-            init_stride=combo[6],
-            # init_stride=(4, 2),
-            drop_path_rate=0.5,  # 0, 0.25 worse
-            norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
-            use_dual_patchnorm=combo[3],  # norm on both sides for the patch embedding
-            use_pos_emb=True,  # use 2d sinusodial positional embeddings
-            head_dim=32,
-            num_heads=8,
-            attn_dropout=0.1,  # 0, 0.1, 0.2 no diff
-            proj_dropout=0.1,  # 0, 0.1 no diff
-            patchmasking_prob=0,  # worse: 0.05 replace 5% of the initial tokens with a </mask> token
-            scale_value=1.0,  # scale attention logits by this value
-            trainable_scale=False,  # if scale can be trained
-            num_mem_vecs=0,  # additional memory vectors (in the attention layers)  # 16,32
-            sparse_topk=0,  # sparsify - keep only top k values (in the attention layers)
-            l2=False,  # l2 norm on tokens (in the attention layers)
-            improve_locality=False,  # remove attention on own token
-            use_starreglu=False,  # use gated StarReLU
-            use_seqpool=True
-        )
-        my_metaformer = my_metaformer.to(device)
+        if not USE_MAX_MODEL:
+            my_metaformer = CAFormer(
+                in_channels=1,
+                depths=(3, 3, 9, 3),
+                dims=(64, 128, 320, 512),  # 32-256
+                init_kernel_size=combo[5],
+                # init_kernel_size=(8, 4),
+                init_stride=combo[6],
+                # init_stride=(4, 2),
+                drop_path_rate=0.5,  # 0, 0.25 worse
+                norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
+                use_dual_patchnorm=combo[3],  # norm on both sides for the patch embedding
+                use_pos_emb=True,  # use 2d sinusodial positional embeddings
+                head_dim=32,
+                num_heads=8,
+                attn_dropout=0.1,  # 0, 0.1, 0.2 no diff
+                proj_dropout=0.1,  # 0, 0.1 no diff
+                patchmasking_prob=0,  # worse: 0.05 replace 5% of the initial tokens with a </mask> token
+                scale_value=1.0,  # scale attention logits by this value
+                trainable_scale=False,  # if scale can be trained
+                num_mem_vecs=0,  # additional memory vectors (in the attention layers)  # 16,32
+                sparse_topk=0,  # sparsify - keep only top k values (in the attention layers)
+                l2=False,  # l2 norm on tokens (in the attention layers)
+                improve_locality=False,  # remove attention on own token
+                use_starreglu=False,  # use gated StarReLU
+                use_seqpool=True
+            )
+            my_metaformer = my_metaformer.to(device)
+        else:
+            my_metaformer = torch.load(f'best_performance/best_{DATASET}_model')
+            my_metaformer = my_metaformer.to(device)
+
         log.info(f"Training Cycle {i + 1} of {len(hyperparam_combinations)}")
 
         training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo,
@@ -212,7 +219,8 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
     scheduler_warumup = LambdaLR(optimizer, lr_lambda)
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=1.2 * EPOCHS)
 
-    ema: EMA = EMA(model, beta=0.9999, update_every=10, update_after_step=EPOCHS * EMA_START)
+    # ema: EMA = EMA(model, beta=0.9999, update_every=10, update_after_step=EPOCHS * EMA_START)
+    model_ema = ModelEmaV2(model=model)
 
     for epoch in (range(1, EPOCHS + 1)):
         log.info(f"Iteration {iteration[0]}/ {iteration[1]} - Epoch {epoch} / {EPOCHS}")
@@ -235,8 +243,8 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
             loss.backward()
             batch_losses.append(loss.item())
             optimizer.step()
-            if EMA_ON:
-                ema.update()
+            if EMA_ON and model_ema is not None:
+                model_ema.update(model)
         if LR_WARUMUP and epoch < (EPOCHS / 10):  # /20
             scheduler_warumup.step()
         if COSINE and epoch > (EPOCHS / 10):
@@ -244,8 +252,6 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
         train_losses.append(batch_losses)
         train_loss = np.mean(train_losses[-1])
         model.eval()
-        # y_pred = []
-        # y_true = []
         batch_losses, trace_y, trace_yhat, lrs = [], [], [], []
         for i, data in enumerate(val_loader):
             x, y = data
@@ -257,11 +263,6 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
             trace_yhat.append(y_hat.cpu().detach().numpy())
             batch_losses.append(loss.item())
             lrs.append(optimizer.param_groups[0]["lr"])
-            # output = (torch.max(torch.exp(y_hat), 1)[1]).data.cpu().numpy()
-            # y_pred.extend(output)  # Save Prediction
-            # labels = y.data.cpu().numpy()
-            # y_true.extend(labels)  # Save Truth
-            # classes = data.categories
         valid_losses.append(batch_losses)
         trace_y = np.concatenate(trace_y)
         trace_yhat = np.concatenate(trace_yhat)
