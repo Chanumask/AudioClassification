@@ -30,7 +30,7 @@ def conf_matrix(model, loader, data):
     cf_matrix = confusion_matrix(y_true, y_pred)
     df_cm = pd.DataFrame(cf_matrix, index=[i for i in classes],
                          columns=[i for i in classes])
-    print(f"sum_of_values = {df_cm.values.sum()}")
+    # print(f"sum_of_values = {df_cm.values.sum()}")
     plt.figure(figsize=(20, 14))
     sns.heatmap(df_cm, annot=True)
     plt.savefig('results/confusion_matrix.png')

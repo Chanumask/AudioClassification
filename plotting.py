@@ -190,7 +190,7 @@ def plot_spectrogram(waveform, sample_rate, title="Spectrogram", xlim=None):
 
 
 # PLOT RESULTS
-def liveplot(result_list, pairs, epoch):
+def liveplot(result_list, pairs):
     plt.close()
     plt.ion()
     plt.show()
@@ -204,13 +204,13 @@ def liveplot(result_list, pairs, epoch):
                         hspace=0.52)
     for i, pair in enumerate(pairs):
         for title, graphs in pair.items():
-            ax[i].set_xlabel(title.partition('vs')[2])
-            ax[i].set_ylabel(title.partition('vs')[0])
+            ax[i].set_xlabel("Epochs")
+            ax[i].set_ylabel(title)
 
             for graph in graphs:
                 ax[i].plot([res[graph] for res in result_list], '-x', color=cols[i])
-                plt.draw()
-                plt.pause(0.0001)
+            plt.draw()
+            plt.pause(0.0001)
 
 
 def find_max_acc_epoch(results):

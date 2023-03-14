@@ -7,7 +7,7 @@ HYPERPARAMS_SPEECH = {
     'init_kernel_size': [(8, 4)],
     'init_stride': [(4, 2)],
     'weight_decay': [1e-2],
-    'comment': ["alternative EMA"]
+    'comment': [""]
 }
 
 HYPERPARAMS_ESC50 = {
@@ -19,7 +19,7 @@ HYPERPARAMS_ESC50 = {
     'init_kernel_size': [3],
     'init_stride': [2],
     'weight_decay': [1e-3],
-    'comment': [""]
+    'comment': ["EMA 0.7"]
 }
 
 HYPERPARAMS_MUSIC = {
@@ -31,40 +31,40 @@ HYPERPARAMS_MUSIC = {
     'init_kernel_size': [(3, 3)],
     'init_stride': [(2, 2)],
     'weight_decay': [1e-3],
-    'comment': ["300 Epochs"]
+    'comment': ["EMA 0.7"]
 }
 
 HYPERPARAMS_PRIMATES = {
     'learning_rate': [1e-4],
-    'rrc': [False],  # RandomResizeCrop
+    'rrc': [True],  # RandomResizeCrop
     'rlf': [False],  # RandomLinearFade
     'dual_patchnorm': [False],
     'mixup': [False],  # only 1 value possible atm
     'init_kernel_size': [3],
     'init_stride': [2],
     'weight_decay': [1e-3],
-    'comment': [""]
+    'comment': ["RRC=True"]
 }
 
 # General
-DATASET = "SPEECH"  # "SPEECH", "ESC50", "MUSIC"
-RNG_SEED = 2  # 2, 1, 1
+DATASET = "PRIMATES"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+RNG_SEED = 2  # 2, 1, 1, 1
 
 ONLY_TABULATE = False
-SAVE_DATA = False
-SAVE_MAX_MODEL = False
-USE_MAX_MODEL = True
+SAVE_DATA = True
+SAVE_MAX_MODEL = True
+USE_MAX_MODEL = False
 PLOT_RES = True
 MONITORING = False
-UPDATE_INTERVAL = 5  # every x Epochs
+UPDATE_INTERVAL = 1  # every x Epochs
 CONF_MATRIX = True
 
 # Training Loop
 BATCH_SIZE = 16  # 32, 64
-EPOCHS = 1
+EPOCHS = 120
 LR_WARUMUP = True
 COSINE = True
-EMA_ON = False
+EMA_ON = True
 EMA_START = 0.7
 
 # Dataset paths
@@ -72,6 +72,7 @@ SPEECH_DATASET_PATH = "data/SpeechCommands"
 SPEECH_JSON_PATH = "data/SpeechCommands/speechData.json"
 MUSIC_DATASET_PATH = "data/GTZAN/genres_original"
 MUSIC_JSON_PATH = "data/GTZAN/musicData.json"
+PRIMATES_DATASET_PATH = "data/Primates/wav"
 
 # Spectrogram
 SAMPLE_RATE = 22050

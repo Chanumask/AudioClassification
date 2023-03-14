@@ -2,13 +2,14 @@ import logging
 import time
 from itertools import product
 
+import pandas as pd
 import timm
 import tqdm
 from colorlog import ColoredFormatter
 
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from x_metaformer import CAFormer
 import pytorch_lightning as pl
 from ema_pytorch import EMA
@@ -17,6 +18,7 @@ import plotting
 from ESC50Dataset import ESC50Data
 from MusicDataset import split_music_dataset, MusicDataset
 from SpeechDataset import *
+from PrimatesDataset import *
 from AudioUtil import *
 from metrics import *
 
@@ -30,6 +32,8 @@ def setup_parameters():
         current_hypers = HYPERPARAMS_MUSIC
     elif DATASET == "ESC50":
         current_hypers = HYPERPARAMS_ESC50
+    else:
+        current_hypers = HYPERPARAMS_PRIMATES
     return current_hypers
 
 
@@ -83,6 +87,16 @@ def get_data(mixup):
         # print(dict(zip(unique, counts)))
         train_data = MusicDataset("training", x_train, y_train, categories, mixup=mixup)
         valid_data = MusicDataset("validation", x_validation, y_validation, categories, mixup=False)
+
+    elif DATASET == "PRIMATES":
+        num_classes = 4
+        metadata_train = "data/Primates/lab/train.csv"
+
+        x_train, y_train, x_val, y_val, x_test, y_test, categories = split_primates_dataset(metadata_train)
+
+        train_data = PrimatesDataset("training", x_train, y_train, categories, mixup=mixup)
+        valid_data = PrimatesDataset("validation", x_val, y_val, categories, mixup=False)
+
     return train_data, valid_data, num_classes
 
 
@@ -219,8 +233,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
     scheduler_warumup = LambdaLR(optimizer, lr_lambda)
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=1.2 * EPOCHS)
 
-    # ema: EMA = EMA(model, beta=0.9999, update_every=10, update_after_step=EPOCHS * EMA_START)
-    model_ema = ModelEmaV2(model=model)
+    ema = EMA(model, beta=0.99, update_every=10, update_after_step=EPOCHS * EMA_START)
 
     for epoch in (range(1, EPOCHS + 1)):
         log.info(f"Iteration {iteration[0]}/ {iteration[1]} - Epoch {epoch} / {EPOCHS}")
@@ -243,8 +256,8 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
             loss.backward()
             batch_losses.append(loss.item())
             optimizer.step()
-            if EMA_ON and model_ema is not None:
-                model_ema.update(model)
+            if EMA_ON and ema is not None:
+                ema.update()
         if LR_WARUMUP and epoch < (EPOCHS / 10):  # /20
             scheduler_warumup.step()
         if COSINE and epoch > (EPOCHS / 10):
@@ -257,7 +270,10 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
             x, y = data
             x = x.to(device, dtype=torch.float32)
             y = y.to(device, dtype=torch.long)
-            y_hat = model(x)
+            if EMA_ON:
+                y_hat = ema(x)
+            else:
+                y_hat = model(x)
             loss = loss_fn(y_hat, y)
             trace_y.append(y.cpu().detach().numpy())
             trace_yhat.append(y_hat.cpu().detach().numpy())
@@ -272,12 +288,12 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
         res_array.append(
             {'avg_valid_loss': valid_loss, 'avg_valid_acc': accuracy, 'avg_train_loss': train_loss,
              'lr': np.average(lrs), 'f1': f1})
-        if MONITORING and epoch % UPDATE_INTERVAL == 0 and epoch != EPOCHS:
+        if MONITORING and epoch % UPDATE_INTERVAL == 0:
             plotting.liveplot(res_array,
-                                   [{"Accuracies vs epochs": ['avg_valid_acc']}, {"f1_score vs epochs": ['f1']},
-                                    {"Train Losses vs epochs": ['avg_train_loss']},
-                                    {"Valid Losses vs epochs": ['avg_valid_loss']},
-                                    {"Learning rates per batch vs epochs": ['lr']}], epoch=EPOCHS)
+                              [{"Accuracies": ['avg_valid_acc']}, {"f1_score": ['f1']},
+                               {"Train Losses": ['avg_train_loss']},
+                               {"Valid Losses": ['avg_valid_loss']},
+                               {"Learning rates per batch": ['lr']}])
     seconds = (time.time() - start_time)
     minutes = int(seconds // 60)
     remaining_seconds = int(round(seconds % 60, 0))
@@ -297,6 +313,14 @@ if __name__ == "__main__":
 
     train_data, valid_data, num_classes = get_data(current_hyperparams['mixup'][0])
 
+    # if DATASET == "PRIMATES":
+    #     y_train = train_data.labels
+    #     class_sample_count = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
+    #     weight = 1./class_sample_count
+    #     samples_weight = np.array([weight[t] for t in y_train])
+    #     sampler = WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), len(samples_weight))
+    #     train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, sampler=sampler)
+    # else:
     train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
     valid_loader = DataLoader(valid_data, batch_size=BATCH_SIZE, shuffle=True)
 
