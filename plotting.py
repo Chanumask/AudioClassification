@@ -224,6 +224,7 @@ def plot_spectrogram(waveform, sample_rate, title="Spectrogram", xlim=None):
 
 # PLOT RESULTS
 def liveplot(result_list, pairs):
+    print(pairs)
     plt.close()
     plt.ion()
     plt.show()
@@ -258,7 +259,7 @@ def find_max_acc_epoch(results):
 
 def plot_results(result_list):
     colors = sns.color_palette("bright", 10)
-    fig, ax = plt.subplots(4, figsize=(12, 10))
+    fig, ax = plt.subplots(5, figsize=(12, 10))
     plt.subplots_adjust(left=0.08, bottom=0.05, right=0.98, top=0.95, wspace=0.4, hspace=0.52)
 
     label_distance = 5
@@ -272,6 +273,7 @@ def plot_results(result_list):
     ax[1].set_ylabel("F1 Score")
     ax[2].set_ylabel("Losses")
     ax[3].set_ylabel("Learning Rate")
+    ax[4].set_ylabel("UAR")
 
     max_acc_value, max_acc_epoch = find_max_acc_epoch(result_list)
     max_acc_value = round(max_acc_value * 100, 2)
@@ -283,7 +285,8 @@ def plot_results(result_list):
     ax[2].plot([res['avg_train_loss'] for res in result_list], marker='o', color=colors[3], label='Train Loss')
     ax[2].plot([res['avg_valid_loss'] for res in result_list], marker='^', color=colors[6], label='Valid Loss')
     ax[2].legend()
-    ax[3].plot([res['lr'] for res in result_list], marker='o', color='k')
+    ax[3].plot([res['uar'] for res in result_list], marker='o', color='k')
+    ax[4].plot([res['lr'] for res in result_list], marker='o', color='k')
 
     plt.savefig('plotted_results.png', dpi=300, bbox_inches="tight")
 

@@ -179,7 +179,8 @@ def train_with_hyperparams(hyperparams, filepath):
                                  iteration=[i + 1, len(hyperparam_combinations)])
 
         max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
-        log.info(f'Maximum Accuracy: {max_acc}')
+        max_uar = np.max([elem['uar'] for elem in training_results])
+        log.info(f'Maximum Accuracy: {max_acc}, Maximum UAR: {max_uar}')
 
         if SAVE_DATA:
             # Append hyperparams and results to json file
@@ -284,15 +285,16 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
         accuracy = np.mean(trace_yhat.argmax(axis=1) == trace_y)
         valid_loss = np.mean(valid_losses[-1])
         f1 = f1score(model, val_loader)
+        uar = uar_score(trace_y, trace_yhat)
         res_array.append(
             {'avg_valid_loss': valid_loss, 'avg_valid_acc': accuracy, 'avg_train_loss': train_loss,
-             'lr': np.average(lrs), 'f1': f1})
+             'lr': np.average(lrs), 'f1': f1, 'uar': uar})
         if MONITORING and epoch % UPDATE_INTERVAL == 0:
             plotting.liveplot(res_array,
                               [{"Accuracies": ['avg_valid_acc']}, {"f1_score": ['f1']},
                                {"Train Losses": ['avg_train_loss']},
                                {"Valid Losses": ['avg_valid_loss']},
-                               {"Learning rates per batch": ['lr']}])
+                               {"Learning rates per batch": ['lr']}, {"Unweighted Average Recall": ['uar']}])
     seconds = (time.time() - start_time)
     minutes = int(seconds // 60)
     remaining_seconds = int(round(seconds % 60, 0))

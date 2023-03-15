@@ -42,17 +42,17 @@ HYPERPARAMS_PRIMATES = {
     'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [3],
     'init_stride': [2],
-    'weight_decay': [1e-3],
-    'comment': ["seed 1"]
+    'weight_decay': [1e-3],     # try 2 or 4
+    'comment': ["EMA = False"]
 }
 
 # General
-DATASET = "ESC50"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
-RNG_SEED = 1  # 2, 1, 1, 1
-
+DATASET = "PRIMATES"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+RNG_SEED = 2  # 2, 1, 1, 2
 ONLY_TABULATE = False
-ONLY_PLOT_EXAMPLE = True
+ONLY_PLOT_EXAMPLE = False
 SAVE_DATA = True
+
 SAVE_MAX_MODEL = True
 USE_MAX_MODEL = False
 PLOT_RES = True
@@ -65,7 +65,7 @@ BATCH_SIZE = 16  # 32, 64
 EPOCHS = 120
 LR_WARUMUP = True
 COSINE = True
-EMA_ON = True
+EMA_ON = False
 EMA_START = 0.7
 
 # Dataset paths

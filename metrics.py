@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from sklearn.metrics import confusion_matrix, f1_score
+from sklearn.metrics import confusion_matrix, f1_score, balanced_accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -57,3 +57,10 @@ def get_max_acc(training_results):
     for r in training_results:
         accs.append(r['avg_valid_acc'])
     return max(accs)
+
+
+def uar_score(trace_y, trace_yhat):
+    y_pred = trace_yhat.argmax(axis=1)
+    y_true = trace_y
+    uar = balanced_accuracy_score(y_true, y_pred)
+    return uar
