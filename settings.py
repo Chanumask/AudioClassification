@@ -39,25 +39,26 @@ HYPERPARAMS_PRIMATES = {
     'rrc': [True],  # RandomResizeCrop
     'rlf': [False],  # RandomLinearFade
     'dual_patchnorm': [False],
-    'mixup': [False],  # only 1 value possible atm
+    'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [3],
     'init_stride': [2],
     'weight_decay': [1e-3],
-    'comment': ["RRC=True"]
+    'comment': ["seed 1"]
 }
 
 # General
-DATASET = "PRIMATES"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
-RNG_SEED = 2  # 2, 1, 1, 1
+DATASET = "ESC50"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+RNG_SEED = 1  # 2, 1, 1, 1
 
 ONLY_TABULATE = False
+ONLY_PLOT_EXAMPLE = True
 SAVE_DATA = True
 SAVE_MAX_MODEL = True
 USE_MAX_MODEL = False
 PLOT_RES = True
 MONITORING = False
 UPDATE_INTERVAL = 1  # every x Epochs
-CONF_MATRIX = True
+CONF_MATRIX = False
 
 # Training Loop
 BATCH_SIZE = 16  # 32, 64
@@ -73,6 +74,8 @@ SPEECH_JSON_PATH = "data/SpeechCommands/speechData.json"
 MUSIC_DATASET_PATH = "data/GTZAN/genres_original"
 MUSIC_JSON_PATH = "data/GTZAN/musicData.json"
 PRIMATES_DATASET_PATH = "data/Primates/wav"
+PRIMATES_CSV = "data/Primates/lab/train.csv"
+ESC50_DATASET_PATH = "data/ESC-50-master/audio"
 
 # Spectrogram
 SAMPLE_RATE = 22050

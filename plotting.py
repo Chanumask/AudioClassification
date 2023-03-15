@@ -1,4 +1,5 @@
 import json
+import os
 import pickle
 import seaborn as sns
 
@@ -46,7 +47,7 @@ def plot_example(title=None, ylabel='freq_bin', aspect='auto', xmax=None):
 
 
 # PLOT FROM WAVEFORM (LIBROSA)
-def plotWave(signal):
+def plot_wave(signal):
     # signal = signal.numpy()
     librosa.display.waveshow(y=signal, sr=SAMPLE_RATE, alpha=0.4)
     plt.xlabel("Time (s)")
@@ -145,7 +146,39 @@ def plotMelSpectrogram(signal):
     return plt
 
 
-def plotAll(signal, wavename):
+def get_dataset_path(dataset_name):
+    if dataset_name == "SPEECH":
+        return SPEECH_DATASET_PATH
+    elif dataset_name == "MUSIC":
+        return MUSIC_DATASET_PATH
+    elif dataset_name == "PRIMATES":
+        return PRIMATES_DATASET_PATH
+    elif dataset_name == "ESC50":
+        return ESC50_DATASET_PATH
+    else:
+        raise ValueError("Invalid dataset name.")
+
+
+def plot_all(dataset_name):
+    dataset_path = get_dataset_path(dataset_name)
+
+    if os.path.isdir(dataset_path):
+        # Dataset path points to a directory
+        subdirs = [d for d in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, d))]
+        if len(subdirs) > 0:
+            # Dataset path points to a directory of subdirectories containing samples
+            subdir_path = os.path.join(dataset_path, random.choice(subdirs))
+            sample_file = random.choice(os.listdir(subdir_path))
+            sample_path = os.path.join(subdir_path, sample_file)
+        else:
+            # Dataset path points to a directory of samples
+            sample_file = random.choice(os.listdir(dataset_path))
+            sample_path = os.path.join(dataset_path, sample_file)
+    else:
+        # Dataset path points to a single file
+        sample_path = dataset_path
+
+    signal, sr = librosa.load(sample_path, sr=None, mono=True)
     plt.figure(figsize=(15, 10))
     plt.figure.__name__ = "test"
     plt.subplots_adjust(left=0.1,
@@ -155,7 +188,7 @@ def plotAll(signal, wavename):
                         wspace=0.4,
                         hspace=0.4)
     plt.subplot(3, 2, 1)
-    plotWave(signal)
+    plot_wave(signal)
     plt.subplot(3, 2, 2)
     plotPowerSpectrum(signal)
     plt.subplot(3, 2, 3)
@@ -167,7 +200,7 @@ def plotAll(signal, wavename):
     plt.subplot(3, 2, 6)
     plotMelSpectrogram(signal)
     fig = pylab.gcf()
-    fig.canvas.manager.set_window_title(f"class is: {wavename}")
+    fig.canvas.manager.set_window_title(f"class is: {sr}")
     plt.show()
 
 
@@ -264,12 +297,13 @@ def tabulate_data(filepath):
 
     # iterate over data
     for i in range(0, len(data), 3):
-        params, acc, seed = data[i], data[i + 1], data[i+2]
+        params, acc, seed = data[i], data[i + 1], data[i + 2]
         lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, comment = params
 
         # get the results values
         # add a new row to the DataFrame
-        df.loc[i // 2] = [comment, acc, seed, init_kernel_size, init_stride, rcc, rlf, dual_patchnorm, mixup, weight_decay]
+        df.loc[i // 2] = [comment, acc, seed, init_kernel_size, init_stride, rcc, rlf, dual_patchnorm, mixup,
+                          weight_decay]
 
     # sort the rows based on the 'Avg Valid Acc' column
     df = df.sort_values(by=['Max acc'], ascending=False)

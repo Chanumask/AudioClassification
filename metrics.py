@@ -25,9 +25,9 @@ def conf_matrix(model, loader, data):
             y_true.append(true_label)  # Save Truth
 
     classes = data.categories
-
     # Build confusion matrix
     cf_matrix = confusion_matrix(y_true, y_pred)
+    print(cf_matrix.shape)
     df_cm = pd.DataFrame(cf_matrix, index=[i for i in classes],
                          columns=[i for i in classes])
     # print(f"sum_of_values = {df_cm.values.sum()}")

@@ -9,7 +9,7 @@ from colorlog import ColoredFormatter
 
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler, TensorDataset
 from x_metaformer import CAFormer
 import pytorch_lightning as pl
 from ema_pytorch import EMA
@@ -90,9 +90,8 @@ def get_data(mixup):
 
     elif DATASET == "PRIMATES":
         num_classes = 4
-        metadata_train = "data/Primates/lab/train.csv"
 
-        x_train, y_train, x_val, y_val, x_test, y_test, categories = split_primates_dataset(metadata_train)
+        x_train, y_train, x_val, y_val, x_test, y_test, categories = split_primates_dataset(PRIMATES_CSV)
 
         train_data = PrimatesDataset("training", x_train, y_train, categories, mixup=mixup)
         valid_data = PrimatesDataset("validation", x_val, y_val, categories, mixup=False)
@@ -306,6 +305,9 @@ if __name__ == "__main__":
         filename = f"results//results_{DATASET}.json"
         plotting.tabulate_data(filename)
         quit()
+    if ONLY_PLOT_EXAMPLE:
+        plotting.plot_all(DATASET)
+        quit()
 
     current_hyperparams = setup_parameters()
     log = initiate_logging()
@@ -313,16 +315,29 @@ if __name__ == "__main__":
 
     train_data, valid_data, num_classes = get_data(current_hyperparams['mixup'][0])
 
-    # if DATASET == "PRIMATES":
-    #     y_train = train_data.labels
-    #     class_sample_count = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
-    #     weight = 1./class_sample_count
-    #     samples_weight = np.array([weight[t] for t in y_train])
-    #     sampler = WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), len(samples_weight))
-    #     train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True, sampler=sampler)
-    # else:
-    train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
-    valid_loader = DataLoader(valid_data, batch_size=BATCH_SIZE, shuffle=True)
+    if DATASET == "PRIMATES":
+        df = pd.read_csv(PRIMATES_CSV)
+        # df = df[df.label != "background"]  # no background
+        y_train = train_data.labels
+        y_val = valid_data.labels
+        class_count_train = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
+        class_count_val = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
+        weight_train = 1. / class_count_train
+        weight_val = 1. / class_count_val
+        samples_weight_train = np.array([weight_train[t] for t in y_train])
+        samples_weight_val = np.array([weight_val[t] for t in y_val])
+        # print(f'sample_weights: {samples_weight}')
+
+        sampler_train = WeightedRandomSampler(weights=samples_weight_train, num_samples=len(samples_weight_train),
+                                              replacement=True)
+        sampler_val = WeightedRandomSampler(weights=samples_weight_val, num_samples=len(samples_weight_val),
+                                            replacement=True)
+        train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, sampler=sampler_train)
+        valid_loader = DataLoader(valid_data, batch_size=BATCH_SIZE, sampler=sampler_val)
+
+    else:
+        train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
+        valid_loader = DataLoader(valid_data, batch_size=BATCH_SIZE, shuffle=True)
 
     if torch.cuda.is_available():
         device = torch.device('cuda:0')

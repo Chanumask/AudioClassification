@@ -10,7 +10,7 @@ from settings import *
 
 def load_primate_data(csv_path):
     df = pd.read_csv(csv_path)
-
+    # df = df[df.label != "background"]   # no background
     x = np.array(df["filename"])
     y = np.array(df["label"])
     categories = sorted(df['label'].unique())
@@ -60,7 +60,7 @@ class PrimatesDataset(Dataset):
 
         self.mean /= len(x)
         self.std /= len(x)
-        print('Mean:', self.mean, 'Std:', self.std)
+        # print('Mean:', self.mean, 'Std:', self.std)
 
     def __len__(self):
         return len(self.data)
