@@ -163,7 +163,7 @@ def plot_all(dataset_name):
     dataset_path = get_dataset_path(dataset_name)
 
     if os.path.isdir(dataset_path):
-        # Dataset path points to a directory
+        # Dataset path points to a directory -> pick a random sample
         subdirs = [d for d in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, d))]
         if len(subdirs) > 0:
             # Dataset path points to a directory of subdirectories containing samples
@@ -202,6 +202,7 @@ def plot_all(dataset_name):
     fig = pylab.gcf()
     fig.canvas.manager.set_window_title(f"class is: {sr}")
     plt.show()
+    return sample_path
 
 
 # PLOT FROM WAVE FORM (TORCHAUDIO)
@@ -294,19 +295,16 @@ def plot_results(result_list):
 def tabulate_data(filepath):
     with open(filepath, 'r') as f:
         data = json.load(f)
-
     df = pd.DataFrame(
-        columns=["comment", "Max acc", "seed", "kernel", "stride", "RCC", "RLF", "pn", "Mixup", "wd"])
+        columns=["comment", "Max acc", "seed", "ema", "filt_aug"])
 
     # iterate over data
     for i in range(0, len(data), 3):
         params, acc, seed = data[i], data[i + 1], data[i + 2]
-        lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, comment = params
+        lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, ema, filt_aug, comment = params
 
-        # get the results values
-        # add a new row to the DataFrame
-        df.loc[i // 2] = [comment, acc, seed, init_kernel_size, init_stride, rcc, rlf, dual_patchnorm, mixup,
-                          weight_decay]
+        # get the results values, add a new row to the DataFrame
+        df.loc[i // 2] = [comment, acc, seed, ema, filt_aug]
 
     # sort the rows based on the 'Avg Valid Acc' column
     df = df.sort_values(by=['Max acc'], ascending=False)

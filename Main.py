@@ -2,30 +2,28 @@ import logging
 import time
 from itertools import product
 
-import pandas as pd
-import timm
+import torch
 import tqdm
 from colorlog import ColoredFormatter
 
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
-from torch.utils.data import DataLoader, WeightedRandomSampler, TensorDataset
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from x_metaformer import CAFormer
 import pytorch_lightning as pl
 from ema_pytorch import EMA
 
 import plotting
-from ESC50Dataset import ESC50Data
-from MusicDataset import split_music_dataset, MusicDataset
-from SpeechDataset import *
-from PrimatesDataset import *
+from dataset_classes.ESC50Dataset import ESC50Data
+from dataset_classes.MusicDataset import split_music_dataset, MusicDataset
+from dataset_classes.SpeechDataset import *
+from dataset_classes.PrimatesDataset import *
 from AudioUtil import *
 from metrics import *
 
 
 # SETTINGS
 def setup_parameters():
-    pl.seed_everything(RNG_SEED)
     if DATASET == "SPEECH":
         current_hypers = HYPERPARAMS_SPEECH
     elif DATASET == "MUSIC":
@@ -52,7 +50,11 @@ def initiate_logging():
     return log
 
 
-def get_data(mixup):
+def get_data():
+    if not MAJORITY_VOTE:
+        mixup = dataset_hyperparameters['mixup'][0]
+    else:
+        mixup = None
     global num_classes, categories, train_data, valid_data
     if DATASET == "SPEECH":
         num_classes = 30
@@ -99,6 +101,33 @@ def get_data(mixup):
     return train_data, valid_data, num_classes
 
 
+def get_data_loaders(data_training, data_validation):
+    if DATASET == "PRIMATES":
+        df = pd.read_csv(PRIMATES_CSV)
+        # df = df[df.label != "background"]  # no background
+        y_train = data_training.labels
+        y_val = data_validation.labels
+        class_count_train = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
+        class_count_val = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
+        weight_train = 1. / class_count_train
+        weight_val = 1. / class_count_val
+        samples_weight_train = np.array([weight_train[t] for t in y_train])
+        samples_weight_val = np.array([weight_val[t] for t in y_val])
+        # print(f'sample_weights: {samples_weight}')
+
+        sampler_train = WeightedRandomSampler(weights=samples_weight_train, num_samples=len(samples_weight_train),
+                                              replacement=True)
+        sampler_val = WeightedRandomSampler(weights=samples_weight_val, num_samples=len(samples_weight_val),
+                                            replacement=True)
+        training_loader = DataLoader(data_training, batch_size=BATCH_SIZE, sampler=sampler_train)
+        validation_loader = DataLoader(data_validation, batch_size=BATCH_SIZE, sampler=sampler_val)
+
+    else:
+        training_loader = DataLoader(data_training, batch_size=BATCH_SIZE, shuffle=True)
+        validation_loader = DataLoader(data_validation, batch_size=BATCH_SIZE, shuffle=True)
+    return training_loader, validation_loader
+
+
 def exclude_from_wt_decay(named_params, weight_decay, skip_list):
     params = []
     excluded_params = []
@@ -135,11 +164,12 @@ class BNMetaFormer(CAFormer):
 
 
 def train_with_hyperparams(hyperparams, filepath):
-    # Get all possible combinations of hyperparameters
-    hyperparam_values = list(hyperparams.values())
-    hyperparam_combinations = list(product(*hyperparam_values))
-    log.info(f"Generated {len(hyperparam_combinations)} possible hyperparameter combinations.")
-    # Train model with each combination of hyperparameters and save results
+    # Get all possible combinations of hyperparameters except seed as it is handled outside this function
+    no_seed = list(hyperparams.values())
+    del no_seed[8]
+    hyperparam_combinations = list(product(*no_seed))
+    log.info(f"Generated {len(hyperparam_combinations)} possible hyperparameter combinations for this seed.")
+    # Train model with each combination of hyperparameters except the seed and save results
     for i, combo in enumerate(hyperparam_combinations):
         if not USE_MAX_MODEL:
             my_metaformer = CAFormer(
@@ -173,8 +203,10 @@ def train_with_hyperparams(hyperparams, filepath):
             my_metaformer = torch.load(f'best_performance/best_{DATASET}_model')
             my_metaformer = my_metaformer.to(device)
 
-        log.info(f"Training Cycle {i + 1} of {len(hyperparam_combinations)}")
+        log.info(
+            f"Training Cycle {i * seed} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
 
+        criterion = nn.CrossEntropyLoss()
         training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo,
                                  iteration=[i + 1, len(hyperparam_combinations)])
 
@@ -193,7 +225,7 @@ def train_with_hyperparams(hyperparams, filepath):
 
             data.append(combo)
             data.append(max_acc)
-            data.append(RNG_SEED)
+            data.append(seed)
 
             with open(filepath, 'w') as f:
                 json.dump(data, f)
@@ -209,6 +241,16 @@ def train_with_hyperparams(hyperparams, filepath):
                     with open(f'best_performance/best_{DATASET}_model', 'wb') as g:
                         torch.save(my_metaformer, g)
                         g.close()
+
+        if SAVE_ENSEMBLE:
+            directory = f'ensemble_models/{DATASET}/{ENSEMBLE_NAME}'
+            formatted_acc = int(round(max_acc * 100, 2) * 100)  # 4 digit (9583 = 95,83%)
+            model_filename = f"seed{list(hyperparams.values())[8]}acc{formatted_acc}.pt"
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            with open(f'{directory}/{model_filename}', 'wb') as g:
+                torch.save(my_metaformer, g)
+                g.close()
 
         if CONF_MATRIX:
             log.info("Calculating Confusion Matrix")
@@ -233,7 +275,8 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
     scheduler_warumup = LambdaLR(optimizer, lr_lambda)
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=1.2 * EPOCHS)
 
-    ema = EMA(model, beta=0.99, update_every=10, update_after_step=EPOCHS * EMA_START)
+    # ema = EMA(model, beta=0.99, update_every=10, update_after_step=EPOCHS * 0.7)
+    ema = EMA(model, beta=0.99, update_every=10, update_after_step=1)
 
     for epoch in (range(1, EPOCHS + 1)):
         log.info(f"Iteration {iteration[0]}/ {iteration[1]} - Epoch {epoch} / {EPOCHS}")
@@ -242,12 +285,17 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
 
         for i, data in tqdm(enumerate(train_loader), desc='Epoch progress', ncols=33):
             x, y = data
+
             if hyperparameters[1]:  # RANDOM_RESIZE_CROP
                 resize_cropper = RandomResizeCrop()
                 x = resize_cropper(x)
             if hyperparameters[2]:  # RANDOM_LINEAR_FADE
                 linear_fader = RandomLinearFader()
                 x = linear_fader(x)
+            if hyperparameters[9]:
+                x_squeezed = x.squeeze()
+                x = filt_aug(x_squeezed)
+                x = x.unsqueeze(1)
             optimizer.zero_grad()
             x = x.to(device, dtype=torch.float32)
             y = y.to(device, dtype=torch.long)
@@ -256,7 +304,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
             loss.backward()
             batch_losses.append(loss.item())
             optimizer.step()
-            if EMA_ON and ema is not None:
+            if hyperparameters[8]:  # dseed deleted, everything after -1
                 ema.update()
         if LR_WARUMUP and epoch < (EPOCHS / 10):  # /20
             scheduler_warumup.step()
@@ -270,7 +318,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
             x, y = data
             x = x.to(device, dtype=torch.float32)
             y = y.to(device, dtype=torch.long)
-            if EMA_ON:
+            if hyperparameters[9]:
                 y_hat = ema(x)
             else:
                 y_hat = model(x)
@@ -302,56 +350,89 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
     return res_array
 
 
+def load_ensemble(models_dir):
+    # Load all the trained models from the directory and return them as a list.
+    models = []
+    for file_name in os.listdir(models_dir):
+        if file_name.endswith(".pt"):
+            model_path = os.path.join(models_dir, file_name)
+            loaded_model = torch.load(model_path)
+            models.append(loaded_model)
+    return models
+
+
+def predict_ensemble(ensemble_models):
+    training_data, validation_data, num_categories = get_data()
+    training_loader, validation_loader = get_data_loaders(training_data, validation_data)
+    predictions = []
+
+    for i, model in enumerate(ensemble_models):
+        model.eval()
+        trace_y, trace_yhat = [], []
+        with torch.no_grad():
+            for j, data in enumerate(validation_loader):
+                x, y = data
+                x = x.to(device, dtype=torch.float32)
+                y = y.to(device, dtype=torch.long)
+                y_hat = model(x)
+                trace_y.append(y.cpu().detach().numpy())
+                trace_yhat.append(y_hat.cpu().detach().numpy())
+
+            trace_y = np.concatenate(trace_y)
+            trace_yhat = np.concatenate(trace_yhat)
+            predictions.append(torch.tensor(trace_yhat))
+    return predictions
+
+
+def majority_voting(predictions):
+    stacked_predictions = torch.stack(predictions)
+    majority_preds = []
+    for i in range(stacked_predictions.shape[1]):
+
+        majority_preds.append()
+    print(len(majority_preds))
+
+
 if __name__ == "__main__":
-    if ONLY_TABULATE:
-        filename = f"results//results_{DATASET}.json"
-        plotting.tabulate_data(filename)
-        quit()
-    if ONLY_PLOT_EXAMPLE:
-        plotting.plot_all(DATASET)
-        quit()
-
-    current_hyperparams = setup_parameters()
     log = initiate_logging()
-    log.info(f'Loading and preprocessing {DATASET} datasets...')
-
-    train_data, valid_data, num_classes = get_data(current_hyperparams['mixup'][0])
-
-    if DATASET == "PRIMATES":
-        df = pd.read_csv(PRIMATES_CSV)
-        # df = df[df.label != "background"]  # no background
-        y_train = train_data.labels
-        y_val = valid_data.labels
-        class_count_train = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
-        class_count_val = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
-        weight_train = 1. / class_count_train
-        weight_val = 1. / class_count_val
-        samples_weight_train = np.array([weight_train[t] for t in y_train])
-        samples_weight_val = np.array([weight_val[t] for t in y_val])
-        # print(f'sample_weights: {samples_weight}')
-
-        sampler_train = WeightedRandomSampler(weights=samples_weight_train, num_samples=len(samples_weight_train),
-                                              replacement=True)
-        sampler_val = WeightedRandomSampler(weights=samples_weight_val, num_samples=len(samples_weight_val),
-                                            replacement=True)
-        train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, sampler=sampler_train)
-        valid_loader = DataLoader(valid_data, batch_size=BATCH_SIZE, sampler=sampler_val)
-
-    else:
-        train_loader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
-        valid_loader = DataLoader(valid_data, batch_size=BATCH_SIZE, shuffle=True)
-
     if torch.cuda.is_available():
         device = torch.device('cuda:0')
     else:
         device = torch.device('cpu')
-
     log.info(f"selected device: {device}")
 
-    criterion = nn.CrossEntropyLoss()
+    if ONLY_TABULATE:
+        filename = f"results//newest_results_{DATASET}.json"
+        # filename = f"ensemble_results//results_{DATASET}.json"
+        log.info(f"Here are the results ({filename}):")
+        plotting.tabulate_data(filename)
+        quit()
+    if ONLY_PLOT_EXAMPLE:
+        plotted_path = plotting.plot_all(DATASET)
+        log.info(f"Plotted Data from path: {plotted_path}")
+        quit()
+    if MAJORITY_VOTE:
+        ensemble_path = f"ensemble_models/{DATASET}/{ENSEMBLE_NAME}"
+        log.info(f"Majority voting {DATASET} Dataset. Using Ensemble in {ensemble_path}")
+        models = load_ensemble(ensemble_path)
+        all_predictions = predict_ensemble(models)
+        majority_voting(all_predictions)
+        quit()
 
-    filename = f"results//results_{DATASET}.json"
-    train_with_hyperparams(current_hyperparams, filename)
+    dataset_hyperparameters = setup_parameters()
+
+    for i, seed in enumerate(dataset_hyperparameters['seed']):
+        log.info(
+            f"Training {len(dataset_hyperparameters['seed'])} different Seeds. Currently ({i + 1}/{len(dataset_hyperparameters['seed'])})")
+        pl.seed_everything(seed=seed)
+
+        log.info(f'Loading and preprocessing {DATASET} datasets...')
+        train_data, valid_data, num_classes = get_data()
+        train_loader, valid_loader = get_data_loaders(train_data, valid_data)
+
+        # filename = f"results//ensemble_results_{DATASET}.json"
+        filename = f"results//newest_results_{DATASET}.json"
+        train_with_hyperparams(dataset_hyperparameters, filename)
 
     # CAmodel = CAFormer(
     #     in_channels=1,

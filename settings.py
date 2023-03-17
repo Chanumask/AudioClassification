@@ -7,8 +7,11 @@ HYPERPARAMS_SPEECH = {
     'init_kernel_size': [(8, 4)],
     'init_stride': [(4, 2)],
     'weight_decay': [1e-2],
-    'comment': [""]
-}
+    'seed': [2],
+    'ema': [False],
+    'filt_aug': [False],
+    'comment': ["filt_aug after rrc"]
+}  # add new hyperparams above the comment entry
 
 HYPERPARAMS_ESC50 = {
     'learning_rate': [2e-4],
@@ -19,7 +22,10 @@ HYPERPARAMS_ESC50 = {
     'init_kernel_size': [3],
     'init_stride': [2],
     'weight_decay': [1e-3],
-    'comment': ["EMA 0.7"]
+    'seed': [1],  # 1, 2, 3, 4, 5],
+    'ema': [True],
+    'filt_aug': [True, False],
+    'comment': ["ema start=1"]
 }
 
 HYPERPARAMS_MUSIC = {
@@ -31,7 +37,10 @@ HYPERPARAMS_MUSIC = {
     'init_kernel_size': [(3, 3)],
     'init_stride': [(2, 2)],
     'weight_decay': [1e-3],
-    'comment': ["EMA 0.7"]
+    'seed': [2],
+    'ema': [True],
+    'filt_aug': [True],
+    'comment': ["ema start=1"],
 }
 
 HYPERPARAMS_PRIMATES = {
@@ -42,31 +51,36 @@ HYPERPARAMS_PRIMATES = {
     'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [3],
     'init_stride': [2],
-    'weight_decay': [1e-3],     # try 2 or 4
-    'comment': ["EMA = False"]
+    'weight_decay': [1e-3],  # try 2 or 4
+    'seed': [2],
+    'ema': [True],
+    'filt_aug': [False],
+    'comment': [""]
 }
 
 # General
-DATASET = "PRIMATES"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
-RNG_SEED = 2  # 2, 1, 1, 2
-ONLY_TABULATE = False
+DATASET = "MUSIC"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+ONLY_TABULATE = True
 ONLY_PLOT_EXAMPLE = False
-SAVE_DATA = True
+MAJORITY_VOTE = False
 
-SAVE_MAX_MODEL = True
 USE_MAX_MODEL = False
-PLOT_RES = True
+PLOT_RES = False
 MONITORING = False
 UPDATE_INTERVAL = 1  # every x Epochs
 CONF_MATRIX = False
+
+SAVE_DATA = True
+SAVE_MAX_MODEL = True
+SAVE_ENSEMBLE = False
+ENSEMBLE_NAME = "first"
 
 # Training Loop
 BATCH_SIZE = 16  # 32, 64
 EPOCHS = 120
 LR_WARUMUP = True
 COSINE = True
-EMA_ON = False
-EMA_START = 0.7
+FILT_AUG = True
 
 # Dataset paths
 SPEECH_DATASET_PATH = "data/SpeechCommands"

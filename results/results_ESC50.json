@@ -1,1 +1,41 @@
-[[0.0002, true, false, true, true, 3, 2, 0.001, "300 Epochs"], 0.845, 2, [0.0002, true, false, true, true, 3, 2, 0.001, "300 Epochs"], 0.83, 1, [0.0002, true, false, true, true, 3, 2, 0.001, "EMA 0.7"], 0.8, 1]
+[
+  [
+    0.0002,
+    true,
+    false,
+    true,
+    true,
+    3,
+    2,
+    0.001,
+    "300 Epochs"
+  ],
+  0.845,
+  2,
+  [
+    0.0002,
+    true,
+    false,
+    true,
+    true,
+    3,
+    2,
+    0.001,
+    "300 Epochs"
+  ],
+  0.83,
+  1,
+  [
+    0.0002,
+    true,
+    false,
+    true,
+    true,
+    3,
+    2,
+    0.001,
+    "EMA 0.7"
+  ],
+  0.8,
+  1
+]

@@ -70,7 +70,6 @@ def split_speech_dataset(data_path, test_size=0.2, validation_size=0.2):
     # create train, validation, test split
     x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
     x_train, x_validation, y_train, y_validation = train_test_split(x_train, y_train, test_size=validation_size)
-
     return x_train, y_train, x_validation, y_validation, x_test, y_test, categories
 
 
