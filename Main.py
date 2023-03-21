@@ -1,9 +1,12 @@
 import logging
+import statistics
 import time
 from itertools import product
 
+import pandas as pd
 import torch
 import tqdm
+from IPython.utils import io
 from colorlog import ColoredFormatter
 
 import torch.optim as optim
@@ -163,7 +166,7 @@ class BNMetaFormer(CAFormer):
         return super().forward(x, return_embeddings)
 
 
-def train_with_hyperparams(hyperparams, filepath):
+def train_with_hyperparams(hyperparams, filepath, current_seed):
     # Get all possible combinations of hyperparameters except seed as it is handled outside this function
     no_seed = list(hyperparams.values())
     del no_seed[8]
@@ -200,15 +203,16 @@ def train_with_hyperparams(hyperparams, filepath):
             )
             my_metaformer = my_metaformer.to(device)
         else:
-            my_metaformer = torch.load(f'best_performance/best_{DATASET}_model')
+            # my_metaformer = torch.load(f'best_performance/best_{DATASET}_model')
+            my_metaformer = torch.load(f'ensemble_models/SPEECH/300/seed6acc9750.pt')
             my_metaformer = my_metaformer.to(device)
 
         log.info(
-            f"Training Cycle {i * seed} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
+            f"Training Cycle {(i) * seed + 1} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
 
         criterion = nn.CrossEntropyLoss()
         training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo,
-                                 iteration=[i + 1, len(hyperparam_combinations)])
+                                 iteration=[((i) * seed)+1, len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])])
 
         max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
         max_uar = np.max([elem['uar'] for elem in training_results])
@@ -245,7 +249,7 @@ def train_with_hyperparams(hyperparams, filepath):
         if SAVE_ENSEMBLE:
             directory = f'ensemble_models/{DATASET}/{ENSEMBLE_NAME}'
             formatted_acc = int(round(max_acc * 100, 2) * 100)  # 4 digit (9583 = 95,83%)
-            model_filename = f"seed{list(hyperparams.values())[8]}acc{formatted_acc}.pt"
+            model_filename = f"seed{current_seed}acc{formatted_acc}.pt"
             if not os.path.exists(directory):
                 os.makedirs(directory)
             with open(f'{directory}/{model_filename}', 'wb') as g:
@@ -362,11 +366,17 @@ def load_ensemble(models_dir):
 
 
 def predict_ensemble(ensemble_models):
+    pl.seed_everything(seed=1)
     training_data, validation_data, num_categories = get_data()
     training_loader, validation_loader = get_data_loaders(training_data, validation_data)
-    predictions = []
+    label_array = None
+    df_dict = {}
 
-    for i, model in enumerate(ensemble_models):
+    for c, model in enumerate(ensemble_models):
+        # supress the seed log
+        with io.capture_output() as captured:
+            pl.seed_everything(seed=1)
+
         model.eval()
         trace_y, trace_yhat = [], []
         with torch.no_grad():
@@ -377,20 +387,29 @@ def predict_ensemble(ensemble_models):
                 y_hat = model(x)
                 trace_y.append(y.cpu().detach().numpy())
                 trace_yhat.append(y_hat.cpu().detach().numpy())
-
             trace_y = np.concatenate(trace_y)
             trace_yhat = np.concatenate(trace_yhat)
-            predictions.append(torch.tensor(trace_yhat))
-    return predictions
+            # accuracy = np.mean(np.argmax(trace_yhat, axis=1) == trace_y)
+            ensemble_prediction = np.argmax(trace_yhat, axis=1)
+            pred_array = np.array(ensemble_prediction)
+            if label_array is None:
+                label_array = np.array(trace_y)
+                df_dict[f'label_{c}'] = label_array
+            df_dict[f'pred_{c}'] = pred_array
+    ensemble_df = pd.DataFrame(df_dict)
+    return ensemble_df
 
 
-def majority_voting(predictions):
-    stacked_predictions = torch.stack(predictions)
+def majority_vote(df):
     majority_preds = []
-    for i in range(stacked_predictions.shape[1]):
-
-        majority_preds.append()
-    print(len(majority_preds))
+    for i, row in df.iterrows():
+        label = row['label_0']
+        predictions = row.drop('label_0')
+        mode_pred = statistics.mode(predictions)
+        majority_preds.append(mode_pred)
+    df['majority_vote'] = majority_preds
+    acc = (df['label_0'] == df['majority_vote']).sum() / len(df)
+    return acc
 
 
 if __name__ == "__main__":
@@ -415,8 +434,9 @@ if __name__ == "__main__":
         ensemble_path = f"ensemble_models/{DATASET}/{ENSEMBLE_NAME}"
         log.info(f"Majority voting {DATASET} Dataset. Using Ensemble in {ensemble_path}")
         models = load_ensemble(ensemble_path)
-        all_predictions = predict_ensemble(models)
-        majority_voting(all_predictions)
+        df = predict_ensemble(models)  # predictions are of shape (num_models, num_samples)
+        accuracy = majority_vote(df)
+        log.info(f"Voting Ensemble's accuracy: {accuracy}")
         quit()
 
     dataset_hyperparameters = setup_parameters()
@@ -431,8 +451,8 @@ if __name__ == "__main__":
         train_loader, valid_loader = get_data_loaders(train_data, valid_data)
 
         # filename = f"results//ensemble_results_{DATASET}.json"
-        filename = f"results//newest_results_{DATASET}.json"
-        train_with_hyperparams(dataset_hyperparameters, filename)
+        filename = f"results//ensemble_results_{DATASET}_{ENSEMBLE_NAME}.json"
+        train_with_hyperparams(dataset_hyperparameters, filename, current_seed=seed)
 
     # CAmodel = CAFormer(
     #     in_channels=1,

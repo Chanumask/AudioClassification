@@ -7,8 +7,8 @@ HYPERPARAMS_SPEECH = {
     'init_kernel_size': [(8, 4)],
     'init_stride': [(4, 2)],
     'weight_decay': [1e-2],
-    'seed': [2],
-    'ema': [False],
+    'seed': [0, 4, 5, 8],
+    'ema': [True],
     'filt_aug': [False],
     'comment': ["filt_aug after rrc"]
 }  # add new hyperparams above the comment entry
@@ -22,9 +22,9 @@ HYPERPARAMS_ESC50 = {
     'init_kernel_size': [3],
     'init_stride': [2],
     'weight_decay': [1e-3],
-    'seed': [1],  # 1, 2, 3, 4, 5],
+    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     'ema': [True],
-    'filt_aug': [True, False],
+    'filt_aug': [False],
     'comment': ["ema start=1"]
 }
 
@@ -37,9 +37,9 @@ HYPERPARAMS_MUSIC = {
     'init_kernel_size': [(3, 3)],
     'init_stride': [(2, 2)],
     'weight_decay': [1e-3],
-    'seed': [2],
+    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     'ema': [True],
-    'filt_aug': [True],
+    'filt_aug': [False],
     'comment': ["ema start=1"],
 }
 
@@ -52,15 +52,15 @@ HYPERPARAMS_PRIMATES = {
     'init_kernel_size': [3],
     'init_stride': [2],
     'weight_decay': [1e-3],  # try 2 or 4
-    'seed': [2],
+    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     'ema': [True],
     'filt_aug': [False],
     'comment': [""]
 }
 
 # General
-DATASET = "MUSIC"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
-ONLY_TABULATE = True
+DATASET = "SPEECH"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+ONLY_TABULATE = False
 ONLY_PLOT_EXAMPLE = False
 MAJORITY_VOTE = False
 
@@ -71,16 +71,15 @@ UPDATE_INTERVAL = 1  # every x Epochs
 CONF_MATRIX = False
 
 SAVE_DATA = True
-SAVE_MAX_MODEL = True
-SAVE_ENSEMBLE = False
-ENSEMBLE_NAME = "first"
+SAVE_MAX_MODEL = False
+SAVE_ENSEMBLE = True
+ENSEMBLE_NAME = "300"
 
 # Training Loop
 BATCH_SIZE = 16  # 32, 64
-EPOCHS = 120
+EPOCHS = 300
 LR_WARUMUP = True
 COSINE = True
-FILT_AUG = True
 
 # Dataset paths
 SPEECH_DATASET_PATH = "data/SpeechCommands"
