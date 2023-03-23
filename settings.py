@@ -7,7 +7,7 @@ HYPERPARAMS_SPEECH = {
     'init_kernel_size': [(8, 4)],
     'init_stride': [(4, 2)],
     'weight_decay': [1e-2],
-    'seed': [0, 4, 5, 8],
+    'seed': [2],
     'ema': [True],
     'filt_aug': [False],
     'comment': ["filt_aug after rrc"]
@@ -22,10 +22,10 @@ HYPERPARAMS_ESC50 = {
     'init_kernel_size': [3],
     'init_stride': [2],
     'weight_decay': [1e-3],
-    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    'seed': [1],
     'ema': [True],
     'filt_aug': [False],
-    'comment': ["ema start=1"]
+    'comment': ["use_grn_mpl=True"]
 }
 
 HYPERPARAMS_MUSIC = {
@@ -37,10 +37,10 @@ HYPERPARAMS_MUSIC = {
     'init_kernel_size': [(3, 3)],
     'init_stride': [(2, 2)],
     'weight_decay': [1e-3],
-    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    'seed': [1],
     'ema': [True],
     'filt_aug': [False],
-    'comment': ["ema start=1"],
+    'comment': ["FiltAug before mixup"],
 }
 
 HYPERPARAMS_PRIMATES = {
@@ -52,32 +52,32 @@ HYPERPARAMS_PRIMATES = {
     'init_kernel_size': [3],
     'init_stride': [2],
     'weight_decay': [1e-3],  # try 2 or 4
-    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    'seed': [2],
     'ema': [True],
     'filt_aug': [False],
-    'comment': [""]
+    'comment': ["grn_mlp=False"]
 }
 
 # General
-DATASET = "SPEECH"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
-ONLY_TABULATE = False
+DATASET = "ESC50"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+ONLY_TABULATE = True
 ONLY_PLOT_EXAMPLE = False
-MAJORITY_VOTE = False
+MAJORITY_VOTE = True
 
 USE_MAX_MODEL = False
-PLOT_RES = False
+PLOT_RES = True
 MONITORING = False
 UPDATE_INTERVAL = 1  # every x Epochs
 CONF_MATRIX = False
 
 SAVE_DATA = True
-SAVE_MAX_MODEL = False
-SAVE_ENSEMBLE = True
+SAVE_MAX_MODEL = True
+SAVE_ENSEMBLE = False
 ENSEMBLE_NAME = "300"
 
 # Training Loop
 BATCH_SIZE = 16  # 32, 64
-EPOCHS = 300
+EPOCHS = 80
 LR_WARUMUP = True
 COSINE = True
 

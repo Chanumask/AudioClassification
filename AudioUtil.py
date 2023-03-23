@@ -259,6 +259,7 @@ def filt_aug(features, db_range=[-6, 6], n_band=[3, 6], min_bw=6, filter_type="l
             n_band = [3, 6]
             min_bw = 6
 
+    # print(features.shape)
     batch_size, n_freq_bin, _ = features.shape
     n_freq_band = torch.randint(low=n_band[0], high=n_band[1], size=(1,)).item()  # [low, high)
     if n_freq_band > 1:

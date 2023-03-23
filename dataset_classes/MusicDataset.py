@@ -70,7 +70,7 @@ def split_music_dataset(data_path, test_size=0.2, validation_size=0.2):
 
 
 class MusicDataset(Dataset):
-    def __init__(self, mode, x, y, categories, mixup):
+    def __init__(self, mode, x, y, categories, mixup, filtaug):
         self.data = []
         self.labels = y
         self.mode = mode
@@ -84,6 +84,10 @@ class MusicDataset(Dataset):
             audio = AudioUtil.rechannel(audio, 1)
             audio = AudioUtil.pad_trunc(audio, 4000)
             sgram = AudioUtil.get_spectrogram(audio, n_mels=NMELS, n_fft=NFFT, hop_len=None)
+            if filtaug:
+                # sgram_squeezed = sgram.squeeze()
+                sgram = filt_aug(sgram)
+                # sgram = sgram.unsqueeze(1)
             if mixup:
                 mixer = MixupBYOLA(ratio=0.2, log_mixup_exp=True)
                 sgram = mixer(sgram)
@@ -100,5 +104,5 @@ class MusicDataset(Dataset):
     def __getitem__(self, idx):
         # normalize spectrogram using dataset mean and stddev
         sgram = self.data[idx]
-        sgram = (sgram - self.mean) / self.std
+        sgram = (sgram - self.mean) / self.std  # weg
         return sgram, self.labels[idx]
