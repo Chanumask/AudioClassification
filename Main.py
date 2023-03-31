@@ -17,8 +17,8 @@ import pytorch_lightning as pl
 from ema_pytorch import EMA
 
 import plotting
-from dataset_classes.ESC50Dataset import ESC50Data
-from dataset_classes.MusicDataset import split_music_dataset, MusicDataset
+from dataset_classes.ESC50Dataset import *
+from dataset_classes.MusicDataset import *
 from dataset_classes.SpeechDataset import *
 from dataset_classes.PrimatesDataset import *
 from AudioUtil import *
@@ -61,14 +61,10 @@ def get_data():
     global num_classes, categories, train_data, valid_data
     if DATASET == "SPEECH":
         num_classes = 30
-        # preprocess_speech_dataset(SPEECH_DATASET_PATH, SPEECH_JSON_PATH)
-        x_train, y_train, x_validation, y_validation, x_test, y_test, categories = split_speech_dataset(
-            SPEECH_JSON_PATH)
-        # unique, counts = np.unique(y_train, return_counts=True)
-        # print(dict(zip(unique, counts)))
-        # print(f"categories: {categories}")
+        x_train, y_train, categories = load_speech_dataset(SPEECH_PATH_TRAIN)
+        x_valid, y_valid, _ = load_speech_dataset(SPEECH_PATH_VALID)
         train_data = SpeechDataset("training", x_train, y_train, categories, mixup=mixup)
-        valid_data = SpeechDataset("validation", x_validation, y_validation, categories, mixup=False)
+        valid_data = SpeechDataset("validation", x_valid, y_valid, categories, mixup=False)
 
     elif DATASET == "ESC50":
         num_classes = 50
@@ -77,26 +73,24 @@ def get_data():
         df = pd.read_csv(metadata_file)
         # print(df.head())
 
-        train_df = df[df['fold'] != 5]
-        valid_df = df[df['fold'] == 5]
+        train_df = df[df['fold'] != 1]
+        valid_df = df[df['fold'] == 1]
 
         train_data = ESC50Data("training", audio_path, train_df, 'filename', 'category', mixup=mixup)
         valid_data = ESC50Data("validation", audio_path, valid_df, 'filename', 'category', mixup=False)
 
     elif DATASET == "MUSIC":
         num_classes = 10
-        # preprocess_music_dataset(MUSIC_DATASET_PATH, MUSIC_JSON_PATH)
-        x_train, y_train, x_validation, y_validation, x_test, y_test, categories = split_music_dataset(MUSIC_JSON_PATH)
-        # print(categories)
-        # unique, counts = np.unique(y_train, return_counts=True)
-        # print(dict(zip(unique, counts)))
+        x_train, y_train, categories = load_music_dataset(MUSIC_PATH_TRAIN)
+        x_valid, y_valid, _ = load_music_dataset(MUSIC_PATH_VALID)
         train_data = MusicDataset("training", x_train, y_train, categories, mixup=mixup, filtaug=False)
-        valid_data = MusicDataset("validation", x_validation, y_validation, categories, mixup=False, filtaug=False)
+        valid_data = MusicDataset("validation", x_valid, y_valid, categories, mixup=False, filtaug=False)
 
     elif DATASET == "PRIMATES":
-        num_classes = 4
+        num_classes = 5
 
-        x_train, y_train, x_val, y_val, x_test, y_test, categories = split_primates_dataset(PRIMATES_CSV)
+        x_train, y_train, categories = load_primates_dataset(PRIMATES_CSV_TRAIN)
+        x_val, y_val, _ = load_primates_dataset(PRIMATES_CSV_VALID)
 
         train_data = PrimatesDataset("training", x_train, y_train, categories, mixup=mixup)
         valid_data = PrimatesDataset("validation", x_val, y_val, categories, mixup=False)
@@ -106,8 +100,6 @@ def get_data():
 
 def get_data_loaders(data_training, data_validation):
     if DATASET == "PRIMATES":
-        df = pd.read_csv(PRIMATES_CSV)
-        # df = df[df.label != "background"]  # no background
         y_train = data_training.labels
         y_val = data_validation.labels
         class_count_train = np.array([len(np.where(y_train == t)[0]) for t in np.unique(y_train)])
@@ -162,10 +154,12 @@ class MyMetaFormer(CAFormer):
         self.linear_head = nn.Linear(self.out_dim, num_classes)
 
     def forward(self, x, return_embeddings=False):
-        return super().forward(self.linear_head(x), return_embeddings)
+        out = super().forward(x, return_embeddings)
+        out = self.linear_head(out)
+        return out
 
 
-def train_with_hyperparams(hyperparams, filepath, current_seed):
+def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
     # Get all possible combinations of hyperparameters except seed as it is handled outside this function
     no_seed = list(hyperparams.values())
     del no_seed[8]
@@ -175,14 +169,14 @@ def train_with_hyperparams(hyperparams, filepath, current_seed):
     for i, combo in enumerate(hyperparam_combinations):
         if not USE_MAX_MODEL:
             my_metaformer = MyMetaFormer(
-                num_classes=5,      # get from dataset
+                num_classes=classes_count,
                 in_channels=1,
                 depths=(3, 3, 9, 3),
                 dims=(64, 128, 320, 512),  # 32-256
                 init_kernel_size=combo[5],
-                # init_kernel_size=(8, 4),
+                # init_kernel_size=4,
                 init_stride=combo[6],
-                # init_stride=(4, 2),
+                # init_stride=2,
                 drop_path_rate=0.5,  # 0, 0.25 worse
                 norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
                 use_dual_patchnorm=combo[3],  # norm on both sides for the patch embedding
@@ -209,11 +203,11 @@ def train_with_hyperparams(hyperparams, filepath, current_seed):
             my_metaformer = my_metaformer.to(device)
 
         log.info(
-            f"Training Cycle {(i) * seed + 1} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
+            f"Training Cycle {(i) * seed} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
 
         criterion = nn.CrossEntropyLoss()
         training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo,
-                                 iteration=[((i) * seed) + 1,
+                                 iteration=[(i * seed),
                                             len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])])
 
         max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
@@ -231,6 +225,7 @@ def train_with_hyperparams(hyperparams, filepath, current_seed):
 
             data.append(combo)
             data.append(max_acc)
+            data.append(max_uar)
             data.append(seed)
 
             with open(filepath, 'w') as f:
@@ -424,7 +419,6 @@ def predict_ensemble(ensemble_models):
             batch_yhat = np.stack(batch_yhat, axis=1)
             soft_voting = batch_yhat.mean(1)
             predictions_batch = soft_voting.argmax(-1)
-            print(predictions_batch)
             predictions.append(predictions_batch)
             labels.append(y.cpu().detach().numpy())
 
@@ -457,7 +451,7 @@ if __name__ == "__main__":
     log.info(f"selected device: {device}")
 
     if ONLY_TABULATE:
-        filename = f"results//newest_results_{DATASET}.json"
+        filename = f"results//{SAVE_NAME}//{DATASET}.json"
         # filename = f"ensemble_results//results_{DATASET}.json"
         log.info(f"Here are the results ({filename}):")
         plotting.tabulate_data(filename)
@@ -473,6 +467,8 @@ if __name__ == "__main__":
         df = predict_ensemble(models)
         print(df.head())
         accuracy = (df['labels'] == df['predictions']).sum() / len(df)
+        uar = balanced_accuracy_score(df['labels'], df['predictions'])  # test
+
         log.info(f"Voting Ensemble's accuracy: {accuracy}")
         quit()
 
@@ -487,9 +483,9 @@ if __name__ == "__main__":
         train_data, valid_data, num_classes = get_data()
         train_loader, valid_loader = get_data_loaders(train_data, valid_data)
 
-        filename = f"results//newest_results_{DATASET}.json"
+        filename = f"results//{SAVE_NAME}//{DATASET}.json"
         # filename = f"results//ensemble_results_{DATASET}_{ENSEMBLE_NAME}.json"
-        train_with_hyperparams(dataset_hyperparameters, filename, current_seed=seed)
+        train_with_hyperparams(dataset_hyperparameters, num_classes, filename, current_seed=seed)
 
     # CAmodel = CAFormer(
     #     in_channels=1,

@@ -18,8 +18,8 @@ class ESC50Data(Dataset):
         self.mode = mode
 
         # Compute mean and standard deviation of spectrograms
-        self.mean = torch.zeros((NMELS, 1))
-        self.std = torch.zeros((NMELS, 1))
+        # self.mean = torch.zeros((NMELS, 1))
+        # self.std = torch.zeros((NMELS, 1))
         n_spectrograms = len(df)
         for ind in tqdm(range(n_spectrograms), desc='Computing mean and std', ncols=35):
             row = df.iloc[ind]
@@ -29,10 +29,10 @@ class ESC50Data(Dataset):
             audio = AudioUtil.rechannel(audio, 1)
             audio = AudioUtil.pad_trunc(audio, 4000)
             sgram = AudioUtil.get_spectrogram(audio, n_mels=NMELS, n_fft=NFFT, hop_len=None)
-            self.mean += sgram.mean(axis=(1, 2)).reshape(-1, 1)
-            self.std += sgram.std(axis=(1, 2)).reshape(-1, 1)
-        self.mean /= n_spectrograms
-        self.std /= n_spectrograms
+            # self.mean += sgram.mean(axis=(1, 2)).reshape(-1, 1)
+            # self.std += sgram.std(axis=(1, 2)).reshape(-1, 1)
+        # self.mean /= n_spectrograms
+        # self.std /= n_spectrograms
 
         for i, category in enumerate(self.categories):
             self.c2i[category] = i
@@ -48,7 +48,7 @@ class ESC50Data(Dataset):
             sgram = AudioUtil.get_spectrogram(audio, n_mels=NMELS, n_fft=NFFT, hop_len=None)
 
             # Normalize spectrogram
-            sgram = (sgram - self.mean) / self.std
+            # sgram = (sgram - self.mean) / self.std
 
             if mixup:
                 mixer = MixupBYOLA(ratio=0.2, log_mixup_exp=True)

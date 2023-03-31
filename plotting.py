@@ -296,15 +296,15 @@ def tabulate_data(filepath):
     with open(filepath, 'r') as f:
         data = json.load(f)
     df = pd.DataFrame(
-        columns=["comment", "Max acc", "seed", "ema", "filt_aug"])
+        columns=["comment", "Max acc", "Max UAR", "seed", "dual patchnorm", "AdamW wd"])
 
     # iterate over data
-    for i in range(0, len(data), 3):
-        params, acc, seed = data[i], data[i + 1], data[i + 2]
+    for i in range(0, len(data), 4):
+        params, acc, uar, seed = data[i], data[i + 1], data[i + 2], data[i + 3]
         lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, ema, filt_aug, comment = params
 
         # get the results values, add a new row to the DataFrame
-        df.loc[i // 2] = [comment, acc, seed, ema, filt_aug]
+        df.loc[i // 2] = [comment, acc, uar, seed, dual_patchnorm, weight_decay]
 
     # sort the rows based on the 'Avg Valid Acc' column
     df = df.sort_values(by=['Max acc'], ascending=False)

@@ -13,60 +13,28 @@ TRACK_DURATION = 30
 SAMPLES_PER_TRACK = SR * TRACK_DURATION
 
 
-def preprocess_music_dataset(dataset_path, json_path):
-    # dictionary where we'll store mapping, labels and filenames
-    data = {
-        "mapping": [],
-        "labels": [],
-        "files": []
-    }
-
-    # loop through all sub-dirs
-    for i, (dirpath, dirnames, filenames) in enumerate(os.walk(dataset_path)):
-        # ensure we're at sub-folder level
-        if dirpath is not dataset_path:
-
-            # save label (i.e., sub-folder name) in the mapping
-            label = dirpath.split("/")[-1]
-            data["mapping"].append(label)
-            print("\nProcessing: '{}'".format(label))
-
-            # process all audio files in sub-dir and store MFCCs
-            for j, f in enumerate(filenames):
-                file_path = os.path.join(dirpath, f)
-
-                # store data for analysed track
-                data["labels"].append(i - 1)
-                data["files"].append(file_path)
-                print("{}: {}".format(file_path, i - 1))
-
-        # save data in json file
-        with open(json_path, "w") as fp:
-            json.dump(data, fp, indent=4)
+def create_label_to_id_dict(dataset_path):
+    """Creates a dictionary that maps each label to a unique integer ID."""
+    labels = os.listdir(dataset_path)
+    labels.sort()  # sort labels to ensure consistent ordering
+    label_to_id = {label: i for i, label in enumerate(labels)}
+    return label_to_id
 
 
-def load_data(json_path):
-    with open(json_path, "r") as fp:
-        data = json.load(fp)
+def load_music_dataset(data_file_path):
+    label_to_id = create_label_to_id_dict(MUSIC_DATASET_PATH)
+    with open(data_file_path, "r") as f:
+        file_paths = f.read().splitlines()
 
-    X = np.array(data["files"])
-    y = np.array(data["labels"])
-    m = np.array(data["mapping"])
-    return X, y, m
+    labels = np.zeros(len(file_paths), dtype=int)
 
+    for i, path in enumerate(file_paths):
+        label = path.split("/")[0]
+        label_id = int(label_to_id[label])
+        labels[i] = label_id
 
-def split_music_dataset(data_path, test_size=0.2, validation_size=0.2):
-    x, y, m = load_data(data_path)
-    categories = []
-    for i in m:
-        i = i.split("\\", 1)[1]
-        categories.append(i)
-
-    # create train, validation, test split
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size)
-    x_train, x_validation, y_train, y_validation = train_test_split(x_train, y_train, test_size=validation_size)
-
-    return x_train, y_train, x_validation, y_validation, x_test, y_test, categories
+    categories = sorted(label_to_id.keys())
+    return file_paths, labels, categories
 
 
 class MusicDataset(Dataset):
@@ -79,6 +47,7 @@ class MusicDataset(Dataset):
         self.std = 0
         for ind in tqdm(range(len(x)), desc=self.mode + ' dataset', ncols=37):
             file_path = x[ind]
+            file_path = os.path.join(MUSIC_DATASET_PATH, file_path)
             audio = AudioUtil.open(file_path)
             audio = AudioUtil.resample(audio, SAMPLE_RATE)
             audio = AudioUtil.rechannel(audio, 1)
