@@ -206,21 +206,14 @@ def plot_all(dataset_name):
 
 
 # PLOT FROM WAVE FORM (TORCHAUDIO)
-def plot_spectrogram(waveform, sample_rate, title="Spectrogram", xlim=None):
-    waveform = waveform.numpy()
-    num_channels, num_frames = waveform.shape
-
-    figure, axes = plt.subplots(num_channels, 1)
-    if num_channels == 1:
-        axes = [axes]
-    for c in range(num_channels):
-        axes[c].specgram(waveform[c], Fs=sample_rate)
-        if num_channels > 1:
-            axes[c].set_ylabel(f'Channel {c + 1}')
-        if xlim:
-            axes[c].set_xlim(xlim)
-    figure.suptitle(title)
-    return plt
+def plot_spectrogram(sgram):
+    plt.figure(figsize=(10, 4))
+    plt.imshow(sgram.squeeze().numpy(), origin="lower", cmap="inferno")
+    plt.xlabel("Time")
+    plt.ylabel("Mel frequency")
+    plt.colorbar().set_label("dB")
+    plt.tight_layout()
+    plt.show()
 
 
 # PLOT RESULTS
@@ -273,8 +266,8 @@ def plot_results(result_list):
     ax[0].set_ylabel("Accuracy")
     ax[1].set_ylabel("F1 Score")
     ax[2].set_ylabel("Losses")
-    ax[3].set_ylabel("Learning Rate")
-    ax[4].set_ylabel("UAR")
+    ax[3].set_ylabel("UAR")
+    ax[4].set_ylabel("Learning Rate")
 
     max_acc_value, max_acc_epoch = find_max_acc_epoch(result_list)
     max_acc_value = round(max_acc_value * 100, 2)
@@ -296,15 +289,19 @@ def tabulate_data(filepath):
     with open(filepath, 'r') as f:
         data = json.load(f)
     df = pd.DataFrame(
-        columns=["comment", "Max acc", "Max UAR", "seed", "dual patchnorm", "AdamW wd"])
+        columns=["comment", "Max acc", "Max UAR", "seed", "dual patchnorm", "rrc", "rlf", "mixup", "spec_aug",
+                 "kernelsize",
+                 "stride", "AdamW wd"])
 
     # iterate over data
     for i in range(0, len(data), 4):
         params, acc, uar, seed = data[i], data[i + 1], data[i + 2], data[i + 3]
-        lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, ema, filt_aug, comment = params
+        lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, ema, spec_aug, comment = params
 
         # get the results values, add a new row to the DataFrame
-        df.loc[i // 2] = [comment, acc, uar, seed, dual_patchnorm, weight_decay]
+        df.loc[i // 2] = [comment, acc, uar, seed, dual_patchnorm, rcc, rlf, mixup, spec_aug, init_kernel_size,
+                          init_stride,
+                          weight_decay]
 
     # sort the rows based on the 'Avg Valid Acc' column
     df = df.sort_values(by=['Max acc'], ascending=False)
@@ -314,3 +311,66 @@ def tabulate_data(filepath):
 
     # print the table
     print(df)
+
+
+def average10seeds():
+    rootdir = "results/10seeds"
+    results = []
+    for subdir, dirs, files in os.walk(rootdir):
+        for file_name in files:
+            if file_name.endswith('.json'):
+                file_path = os.path.join(subdir, file_name)
+
+                with open(file_path) as f:
+                    data = json.load(f)
+
+                accuracies = []
+                uars = []
+
+                for i in range(0, len(data), 4):
+                    accuracy = data[i + 1]
+                    uar = data[i + 2]
+
+                    accuracies.append(accuracy)
+                    uars.append(uar)
+
+                avg_accuracy = sum(accuracies) / len(accuracies)
+                avg_accuracy = round(100 * avg_accuracy, 2)
+                avg_uar = sum(uars) / len(uars)
+                avg_uar = round(100 * avg_uar, 2)
+
+                setting = os.path.basename(subdir)
+
+                results.append({
+                    'Setting': setting,
+                    'File Name': file_name,
+                    'Avg. Accuracy': avg_accuracy,
+                    'Avg. UAR': avg_uar
+                })
+
+    df = pd.DataFrame(results)
+
+    def get_baseline_acc(file_name):
+        baseline_df = df[(df['Setting'] == 'baseline') & (df['File Name'] == file_name)]
+        if len(baseline_df) > 0:
+            return baseline_df.iloc[0]['Avg. Accuracy']
+        else:
+            return None
+
+    df['acc improvement'] = df['File Name'].apply(get_baseline_acc)
+    df['acc improvement'] = df['Avg. Accuracy'] - df['acc improvement']
+    # print(df[(df['File Name'] == 'MUSIC.json')])
+    return df
+
+
+def bar_plot_averages(df, setting):
+    plt.figure(figsize=(10, 7))
+    plt.title(f"Average Accuracies for {BARPLOT_SETTING} settings")
+    plt.xlabel("Datasets")
+    plt.ylabel("Accuracy")
+
+    barWidth = 0.2
+    plt.bar(df[(df['Setting'] == setting)]['File Name'], df[(df['Setting'] == setting)]['Avg. Accuracy'],
+            color='royalblue', width=barWidth, label='music')
+    plt.show()
+    return 0

@@ -1,21 +1,21 @@
+import json
 import logging
-import statistics
 import time
-from itertools import product
 
 import pandas as pd
-import torch
 import tqdm
 from IPython.utils import io
 from colorlog import ColoredFormatter
+from itertools import product
 
+import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from x_metaformer import CAFormer
 import pytorch_lightning as pl
 from ema_pytorch import EMA
-
+import AudioUtil
 import plotting
 from dataset_classes.ESC50Dataset import *
 from dataset_classes.MusicDataset import *
@@ -55,16 +55,18 @@ def initiate_logging():
 
 def get_data():
     if not MAJORITY_VOTE:
-        mixup = dataset_hyperparameters['mixup'][0]
+        specaug = dataset_hyperparameters['spec_aug'][0]
     else:
-        mixup = None
+        specaug = None
     global num_classes, categories, train_data, valid_data
     if DATASET == "SPEECH":
         num_classes = 30
         x_train, y_train, categories = load_speech_dataset(SPEECH_PATH_TRAIN)
         x_valid, y_valid, _ = load_speech_dataset(SPEECH_PATH_VALID)
-        train_data = SpeechDataset("training", x_train, y_train, categories, mixup=mixup)
-        valid_data = SpeechDataset("validation", x_valid, y_valid, categories, mixup=False)
+        train_data = SpeechDataset("training", x_train, y_train, categories, specaug=specaug,
+                                   mask_prob=dataset_hyperparameters['mask_prob'][0])
+        valid_data = SpeechDataset("validation", x_valid, y_valid, categories, specaug=False,
+                                   mask_prob=dataset_hyperparameters['mask_prob'][0])
 
     elif DATASET == "ESC50":
         num_classes = 50
@@ -76,15 +78,19 @@ def get_data():
         train_df = df[df['fold'] != 1]
         valid_df = df[df['fold'] == 1]
 
-        train_data = ESC50Data("training", audio_path, train_df, 'filename', 'category', mixup=mixup)
-        valid_data = ESC50Data("validation", audio_path, valid_df, 'filename', 'category', mixup=False)
+        train_data = ESC50Data("training", audio_path, train_df, 'filename', 'category', specaug=specaug,
+                               mask_prob=dataset_hyperparameters['mask_prob'][0])
+        valid_data = ESC50Data("validation", audio_path, valid_df, 'filename', 'category', specaug=False,
+                               mask_prob=dataset_hyperparameters['mask_prob'][0])
 
     elif DATASET == "MUSIC":
         num_classes = 10
         x_train, y_train, categories = load_music_dataset(MUSIC_PATH_TRAIN)
         x_valid, y_valid, _ = load_music_dataset(MUSIC_PATH_VALID)
-        train_data = MusicDataset("training", x_train, y_train, categories, mixup=mixup, filtaug=False)
-        valid_data = MusicDataset("validation", x_valid, y_valid, categories, mixup=False, filtaug=False)
+        train_data = MusicDataset("training", x_train, y_train, categories, specaug=specaug,
+                                  mask_prob=dataset_hyperparameters['mask_prob'][0])
+        valid_data = MusicDataset("validation", x_valid, y_valid, categories, specaug=False,
+                                  mask_prob=dataset_hyperparameters['mask_prob'][0])
 
     elif DATASET == "PRIMATES":
         num_classes = 5
@@ -92,8 +98,10 @@ def get_data():
         x_train, y_train, categories = load_primates_dataset(PRIMATES_CSV_TRAIN)
         x_val, y_val, _ = load_primates_dataset(PRIMATES_CSV_VALID)
 
-        train_data = PrimatesDataset("training", x_train, y_train, categories, mixup=mixup)
-        valid_data = PrimatesDataset("validation", x_val, y_val, categories, mixup=False)
+        train_data = PrimatesDataset("training", x_train, y_train, categories, specaug=specaug,
+                                     mask_prob=dataset_hyperparameters['mask_prob'][0])
+        valid_data = PrimatesDataset("validation", x_val, y_val, categories, specaug=False,
+                                     mask_prob=dataset_hyperparameters['mask_prob'][0])
 
     return train_data, valid_data, num_classes
 
@@ -183,8 +191,8 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
                 use_pos_emb=True,  # use 2d sinusodial positional embeddings
                 head_dim=32,
                 num_heads=8,
-                attn_dropout=0.1,  # 0, 0.1, 0.2 no diff
-                proj_dropout=0.1,  # 0, 0.1 no diff
+                attn_dropout=0.1,
+                proj_dropout=0.1,
                 patchmasking_prob=0,  # worse: 0.05 replace 5% of the initial tokens with a </mask> token
                 scale_value=1.0,  # scale attention logits by this value
                 trainable_scale=False,  # if scale can be trained
@@ -203,11 +211,11 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
             my_metaformer = my_metaformer.to(device)
 
         log.info(
-            f"Training Cycle {(i) * seed} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
+            f"Training Cycle {(len(hyperparam_combinations) * current_seed) + i} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
 
         criterion = nn.CrossEntropyLoss()
         training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo,
-                                 iteration=[(i * seed),
+                                 iteration=[(len(hyperparam_combinations) * current_seed) + i,
                                             len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])])
 
         max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
@@ -273,7 +281,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
         ["temp", "temperature", "scale", "norm"],
     )
     optimizer = optim.AdamW(params, lr=hyperparameters[0], weight_decay=hyperparameters[7])
-    scheduler_warumup = LambdaLR(optimizer, lr_lambda)
+    scheduler_warmup = LambdaLR(optimizer, lr_lambda)
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=1.2 * EPOCHS)
 
     # ema = EMA(model, beta=0.99, update_every=10, update_after_step=EPOCHS * 0.7)
@@ -286,21 +294,21 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
 
         for i, data in tqdm(enumerate(train_loader), desc='Epoch progress', ncols=33):
             x, y = data
-
+            if hyperparameters[4]:  # MIXUP
+                # print("MIXING")
+                x, y = mixup(x, y)
+                y = y.softmax(-1)
             if hyperparameters[1]:  # RANDOM_RESIZE_CROP
                 resize_cropper = RandomResizeCrop()
                 x = resize_cropper(x)
             if hyperparameters[2]:  # RANDOM_LINEAR_FADE
                 linear_fader = RandomLinearFader()
                 x = linear_fader(x)
-            # if hyperparameters[9]:
-            #     x_squeezed = x.squeeze()
-            #     x = filt_aug(x_squeezed)
-            #     x = x.unsqueeze(1)
             optimizer.zero_grad()
             x = x.to(device, dtype=torch.float32)
             y = y.to(device, dtype=torch.long)
             y_hat = model(x)
+            # print(y)
             loss = loss_fn(y_hat, y)
             loss.backward()
             batch_losses.append(loss.item())
@@ -308,7 +316,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
             if hyperparameters[8]:  # dseed deleted, everything after -1
                 ema.update()
         if LR_WARUMUP and epoch < (EPOCHS / 10):  # /20
-            scheduler_warumup.step()
+            scheduler_warmup.step()
         if COSINE and epoch > (EPOCHS / 10):
             scheduler_cos.step()
         train_losses.append(batch_losses)
@@ -451,7 +459,7 @@ if __name__ == "__main__":
     log.info(f"selected device: {device}")
 
     if ONLY_TABULATE:
-        filename = f"results//{SAVE_NAME}//{DATASET}.json"
+        filename = f"results//{SAVE_PATH}//{DATASET}.json"
         # filename = f"ensemble_results//results_{DATASET}.json"
         log.info(f"Here are the results ({filename}):")
         plotting.tabulate_data(filename)
@@ -468,8 +476,12 @@ if __name__ == "__main__":
         print(df.head())
         accuracy = (df['labels'] == df['predictions']).sum() / len(df)
         uar = balanced_accuracy_score(df['labels'], df['predictions'])  # test
-
         log.info(f"Voting Ensemble's accuracy: {accuracy}")
+        quit()
+    if AVG_SEEDS:
+        df = plotting.average10seeds()
+        plotting.bar_plot_averages(df, BARPLOT_SETTING)
+        print(df)
         quit()
 
     dataset_hyperparameters = setup_parameters()
@@ -483,49 +495,6 @@ if __name__ == "__main__":
         train_data, valid_data, num_classes = get_data()
         train_loader, valid_loader = get_data_loaders(train_data, valid_data)
 
-        filename = f"results//{SAVE_NAME}//{DATASET}.json"
+        filename = f"results//{SAVE_PATH}//{DATASET}.json"
         # filename = f"results//ensemble_results_{DATASET}_{ENSEMBLE_NAME}.json"
-        train_with_hyperparams(dataset_hyperparameters, num_classes, filename, current_seed=seed)
-
-    # CAmodel = CAFormer(
-    #     in_channels=1,
-    #     depths=(2, 2, 6, 2),
-    #     dims=(32, 64, 128, 256),
-    #     init_kernel_size=3,
-    #     init_stride=2,
-    #     drop_path_rate=0.5,
-    #     norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
-    #     use_dual_patchnorm=False,  # norm on both sides for the patch embedding
-    #     use_pos_emb=True,  # use 2d sinusodial positional embeddings
-    #     head_dim=32,
-    #     num_heads=4,
-    #     attn_dropout=0.1,
-    #     proj_dropout=0.1,
-    #     patchmasking_prob=0.05,  # replace 5% of the initial tokens with a </mask> token
-    #     scale_value=1.0,  # scale attention logits by this value
-    #     trainable_scale=False,  # if scale can be trained
-    #     num_mem_vecs=0,  # additional memory vectors (in the attention layers)
-    #     sparse_topk=0,  # sparsify - keep only top k values (in the attention layers)
-    #     l2=False,  # l2 norm on tokens (in the attention layers)
-    #     improve_locality=False,  # remove attention on own token
-    #     use_starreglu=False  # use gated StarReLU
-    # )
-    # CAmodel = CAmodel.to(device)
-    # results = train(CAmodel, criterion, train_loader, valid_loader)
-    #
-    # # conf_matrix(my_metaformer, valid_loader, valid_data)
-    #
-    # # Plot results and return max acc
-    # accuracies = []
-    # for result in results:
-    #     accuracies.append(result['avg_valid_acc'])
-    # log.info(f'Maximum Accuracy: {max(accuracies)}')
-    #
-    # log.info("Plotting results")
-    # utilsPlotting.liveplot(results, [{"Accuracies vs epochs": ['avg_valid_acc']}, {"f1_score vs epochs": ['f1']},
-    #                                  {"Train Losses vs epochs": ['avg_train_loss']},
-    #                                  {"Valid Losses vs epochs": ['avg_valid_loss']},
-    #                                  {"Learning rates per batch vs epochs": ['lr']}], epoch=EPOCHS)
-    #
-    # # with open('esc50resnet.pth', 'wb') as f:
-    # #     torch.save(my_metaformer, f)
+        train_with_hyperparams(dataset_hyperparameters, num_classes, filename, current_seed=(i + 1))

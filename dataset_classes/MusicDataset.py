@@ -1,9 +1,4 @@
-import json
-import os
-
-from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
-from tqdm import tqdm
 
 from AudioUtil import *
 from settings import *
@@ -38,13 +33,13 @@ def load_music_dataset(data_file_path):
 
 
 class MusicDataset(Dataset):
-    def __init__(self, mode, x, y, categories, mixup, filtaug):
+    def __init__(self, mode, x, y, categories, specaug, mask_prob):
         self.data = []
         self.labels = y
         self.mode = mode
         self.categories = categories
-        self.mean = 0
-        self.std = 0
+        self.mask_prob = mask_prob
+
         for ind in tqdm(range(len(x)), desc=self.mode + ' dataset', ncols=37):
             file_path = x[ind]
             file_path = os.path.join(MUSIC_DATASET_PATH, file_path)
@@ -52,26 +47,12 @@ class MusicDataset(Dataset):
             audio = AudioUtil.resample(audio, SAMPLE_RATE)
             audio = AudioUtil.rechannel(audio, 1)
             audio = AudioUtil.pad_trunc(audio, 4000)
-            sgram = AudioUtil.get_spectrogram(audio, n_mels=NMELS, n_fft=NFFT, hop_len=None)
-            if filtaug:
-                # sgram_squeezed = sgram.squeeze()
-                sgram = filt_aug(sgram)
-                # sgram = sgram.unsqueeze(1)
-            if mixup:
-                mixer = MixupBYOLA(ratio=0.2, log_mixup_exp=True)
-                sgram = mixer(sgram)
+            sgram = AudioUtil.get_spectrogram(audio, specaug=specaug, mask_prob=mask_prob, n_mels=NMELS, n_fft=NFFT, hop_len=None)
+            # plotting.plot_spectrogram(sgram)
             self.data.append(sgram)
-            self.mean += sgram.mean()
-            self.std += sgram.std()
-
-        self.mean /= len(x)
-        self.std /= len(x)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # normalize spectrogram using dataset mean and stddev
-        sgram = self.data[idx]
-        sgram = (sgram - self.mean) / self.std  # weg
-        return sgram, self.labels[idx]
+        return self.data[idx], self.labels[idx]

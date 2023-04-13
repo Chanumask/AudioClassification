@@ -1,9 +1,10 @@
-import json
-import os
-import numpy as np
 from torch.utils.data import Dataset
 
-from AudioUtil import AudioUtil, MixupBYOLA
+import os
+import numpy as np
+
+
+from AudioUtil import AudioUtil
 from settings import *
 from tqdm import tqdm
 
@@ -90,15 +91,14 @@ def load_speech_dataset(data_file_path):
 
 
 class SpeechDataset(Dataset):
-    def __init__(self, mode, x, y, categories, mixup):
+    def __init__(self, mode, x, y, categories, specaug, mask_prob):
         self.data = []
         self.labels = y
         self.c2i = {}
         self.i2c = {}
         self.mode = mode
         self.categories = categories
-        # self.mean = 0
-        # self.std = 0
+
         for ind in tqdm(range(len(x)), desc=self.mode + ' dataset', ncols=37):
             file_path = x[ind]
             file_path = os.path.join(SPEECH_DATASET_PATH, file_path)
@@ -106,23 +106,11 @@ class SpeechDataset(Dataset):
             audio = AudioUtil.resample(audio, SAMPLE_RATE)
             audio = AudioUtil.rechannel(audio, 1)
             audio = AudioUtil.pad_trunc(audio, 4000)
-            sgram = AudioUtil.get_spectrogram(audio, n_mels=NMELS, n_fft=NFFT, hop_len=None)
-            if mixup:
-                mixer = MixupBYOLA(ratio=0.2, log_mixup_exp=True)
-                sgram = mixer(sgram)
+            sgram = AudioUtil.get_spectrogram(audio, specaug=specaug, mask_prob=mask_prob, n_mels=NMELS, n_fft=NFFT, hop_len=None)
             self.data.append(sgram)
-            # self.mean += sgram.mean()
-            # self.std += sgram.std()
-
-        # self.mean /= len(x)
-        # self.std /= len(x)
-        # print('Mean:', self.mean, 'Std:', self.std)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # normalize spectrogram using dataset mean and stddev
-        sgram = self.data[idx]
-        # sgram = (sgram - self.mean) / self.std
-        return sgram, self.labels[idx]
+        return self.data[idx], self.labels[idx]

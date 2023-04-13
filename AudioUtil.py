@@ -1,5 +1,7 @@
+import os
 from copy import deepcopy
 
+import librosa
 import numpy as np
 import random
 
@@ -11,6 +13,7 @@ from torch.distributions import Uniform
 
 from torchaudio import transforms
 import torchaudio
+from tqdm import tqdm
 
 from settings import *
 import torchaudio.transforms as t
@@ -91,31 +94,56 @@ class AudioUtil:
         return sig.roll(shift_amt), sr
 
     @staticmethod
-    def get_spectrogram(aud, n_mels=NMELS, n_fft=NFFT, hop_len=HOPLENGTH):
+    def get_spectrogram(aud, specaug, mask_prob, n_mels=NMELS, n_fft=NFFT, hop_len=HOPLENGTH):
         signal, sr = aud
         top_db = TOPDB
 
-        # spec has shape [channel, n_mels, time], where channel is mono, stereo etc
         spec = t.MelSpectrogram(sr, n_fft=n_fft, hop_length=hop_len, n_mels=n_mels)(signal)
 
-        #  Time Masking with param possible length of the mask sampled uniformly from [0, time_mask_param)
-        # if TIME_MASKING:
-        #     spec = t.TimeMasking(5)(spec)
-
-        # Frequency Masking with param possible length of the mask sampled uniformly from [0, frequency_mask_param)
-        # if FREQ_MASKING:
-        #     spec = t.FrequencyMasking(2)(spec)
+        # Time and Freq Masking with length of the mask sampled uniformly from [0, mask_param)
+        random_float = random.random()
+        if specaug and random_float < mask_prob:
+            spec = t.TimeMasking(16)(spec)
+            spec = t.FrequencyMasking(8)(spec)
 
         # Convert to decibels
-        # spec = (transforms.AmplitudeToDB(top_db=top_db, stype="power")(spec) + 40) / 40
         spec = transforms.AmplitudeToDB(top_db=top_db)(spec)
 
-        # a2b = transforms.AmplitudeToDB(top_db=top_db, stype="power")
-        # spec = a2b(spec)
-        # print(a2b.)
-        # print(spec.min(), spec.max(), spec.mean())
-
         return spec
+
+
+def calculate_esc_sample_length(dataset_name):
+    print(f"calculating sample lengths of {dataset_name} dataset")
+    if dataset_name == 'music':
+        dir_path = "data/GTZAN/genres_original/blues"
+    elif dataset_name == 'speech':
+        dir_path = "data/SpeechCommands"
+    elif dataset_name == 'primates':
+        dir_path = "data/Primates/wav"
+    elif dataset_name == 'esc50':
+        dir_path = "data/ESC-50-master/audio"
+    else:
+        print('Invalid dataset name. Valid names are: music, speech, primates, esc50')
+        return
+
+    # Loop over all files in the directory and calculate the duration of each wav file
+    durations = []
+    for subdir, dirs, files in tqdm(os.walk(dir_path)):
+        print(f"found {len(dirs)} subdirectories")
+        for file_name in files:
+            if file_name.endswith('.wav'):
+                # Load the audio file
+                file_path = os.path.join(subdir, file_name)
+                audio, sr = librosa.load(file_path)
+
+                duration = librosa.get_duration(y=audio, sr=sr)
+                durations.append(duration)
+
+    average_duration = np.mean(durations)
+    std_duration = np.std(durations)
+
+    print(f"Average duration: {average_duration:.2f} seconds")
+    print(f"Standard deviation: {std_duration:.2f} seconds")
 
 
 class RandomResizeCrop(nn.Module):
@@ -160,11 +188,13 @@ class RandomResizeCrop(nn.Module):
         return torch.cat([torch.jit.wait(fut) for fut in crop_futures], 0)
 
 
-def log_mixup_exp(xa, xb, alpha):
+def log_mixup_exp(xa, xb, la, lb, alpha, n_classes):
+    print("log mixup")
     xa = xa.exp()
     xb = xb.exp()
     x = alpha * xa + (1. - alpha) * xb
-    return torch.log(x + torch.finfo(x.dtype).eps)
+    lmix = alpha * F.one_hot(la, n_classes) + (1. - alpha) * F.one_hot(lb, n_classes)
+    return torch.log(x + torch.finfo(x.dtype).eps), lmix
 
 
 class MixupBYOLA(nn.Module):
@@ -180,28 +210,68 @@ class MixupBYOLA(nn.Module):
         self.ratio = ratio
         self.n = n_memory
         self.log_mixup_exp = log_mixup_exp
-        self.memory_bank = []
+        self.memory_bank_spec = []
+        self.memory_bank_label = []
 
-    def forward(self, x):
+    def forward(self, x, y, num_classes):
         # mix random
         alpha = self.ratio * np.random.random()
-        if self.memory_bank:
+        if self.memory_bank_spec:
             # get z as a mixing background sound
-            z = self.memory_bank[np.random.randint(len(self.memory_bank))]
-            # mix them
-            mixed = log_mixup_exp(x, z, 1. - alpha) if self.log_mixup_exp \
-                else alpha * z + (1. - alpha) * x
-        else:
-            mixed = x
-        # update memory bank
-        self.memory_bank = (self.memory_bank + [x])[-self.n:]
+            zspec = self.memory_bank_spec[np.random.randint(len(self.memory_bank_spec))]
+            zlabel = self.memory_bank_spec[np.random.randint(len(self.memory_bank_spec))]
 
-        return mixed.to(torch.float)
+            # mix them
+            mixed_spec, mixed_labels = log_mixup_exp(x, zspec, y, zlabel, 1. - alpha, num_classes)
+        else:
+            mixed_spec = x
+            mixed_labels = y
+        # update memory bank
+        self.memory_bank_spec = (self.memory_bank_spec + [x])[-self.n:]
+        self.memory_bank_label = (self.memory_bank_label + [y])[-self.n:]
+
+        return mixed_spec.to(torch.float), mixed_labels
 
     def __repr__(self):
         format_string = self.__class__.__name__ + f'(ratio={self.ratio},n={self.n}'
         format_string += f',log_mixup_exp={self.log_mixup_exp})'
         return format_string
+
+
+def mixup(x, y, alpha=1.0):
+    # Sample lambda from beta distribution
+    lam = np.random.beta(alpha, alpha, size=x.size()[0])
+
+    # Generate indices for the second audio sample
+    batch_size = x.size()[0]
+    index = torch.randperm(batch_size)
+
+    # Load second audio sample and label
+    x2 = x[index]
+    y2 = y[index]
+
+    # One-hot encode labels
+    num_classes = y.max() + 1
+    y_onehot = torch.zeros((batch_size, num_classes))
+    y2_onehot = torch.zeros((batch_size, num_classes))
+    for i in range(batch_size):
+        y_onehot[i, y[i].long()] = 1
+        y2_onehot[i, y2[i].long()] = 1
+
+    # Create mixed audio inputs and labels
+    mixed_x = []
+    mixed_y = []
+    for i in range(batch_size):
+        lam_i = torch.from_numpy(np.array(lam[i])).reshape(1, 1, 1)
+        mixed_x_i = lam_i * x[i] + (1 - lam_i) * x2[i]
+        mixed_y_i = lam[i] * y_onehot[i] + (1 - lam[i]) * y2_onehot[i]
+        mixed_x.append(mixed_x_i)
+        mixed_y.append(mixed_y_i)
+
+    mixed_x = torch.stack(mixed_x, dim=0)
+    mixed_y = torch.stack(mixed_y, dim=0)
+
+    return mixed_x, mixed_y
 
 
 class RandomLinearFader(nn.Module):
@@ -245,52 +315,3 @@ class ModelEmaV2(nn.Module):
 
     def set(self, model):
         self._update(model, update_fn=lambda e, m: m)
-
-
-def filt_aug(features, db_range=[-6, 6], n_band=[3, 6], min_bw=6, filter_type="linear"):
-    # this is updated FilterAugment algorithm used for ICASSP 2022
-    if not isinstance(filter_type, str):
-        if torch.rand(1).item() < filter_type:
-            filter_type = "step"
-            n_band = [2, 5]
-            min_bw = 4
-        else:
-            filter_type = "linear"
-            n_band = [3, 6]
-            min_bw = 6
-
-    # print(features.shape)
-    batch_size, n_freq_bin, _ = features.shape
-    n_freq_band = torch.randint(low=n_band[0], high=n_band[1], size=(1,)).item()  # [low, high)
-    if n_freq_band > 1:
-        while n_freq_bin - n_freq_band * min_bw + 1 < 0:
-            min_bw -= 1
-        band_bndry_freqs = torch.sort(torch.randint(0, n_freq_bin - n_freq_band * min_bw + 1,
-                                                    (n_freq_band - 1,)))[0] + \
-                           torch.arange(1, n_freq_band) * min_bw
-        band_bndry_freqs = torch.cat((torch.tensor([0]), band_bndry_freqs, torch.tensor([n_freq_bin])))
-
-        if filter_type == "step":
-            band_factors = torch.rand((batch_size, n_freq_band)).to(features) * (db_range[1] - db_range[0]) + db_range[
-                0]
-            band_factors = 10 ** (band_factors / 20)
-
-            freq_filt = torch.ones((batch_size, n_freq_bin, 1)).to(features)
-            for i in range(n_freq_band):
-                freq_filt[:, band_bndry_freqs[i]:band_bndry_freqs[i + 1], :] = band_factors[:, i].unsqueeze(
-                    -1).unsqueeze(-1)
-
-        elif filter_type == "linear":
-            band_factors = torch.rand((batch_size, n_freq_band + 1)).to(features) * (db_range[1] - db_range[0]) + \
-                           db_range[0]
-            freq_filt = torch.ones((batch_size, n_freq_bin, 1)).to(features)
-            for i in range(n_freq_band):
-                for j in range(batch_size):
-                    freq_filt[j, band_bndry_freqs[i]:band_bndry_freqs[i + 1], :] = \
-                        torch.linspace(band_factors[j, i], band_factors[j, i + 1],
-                                       band_bndry_freqs[i + 1] - band_bndry_freqs[i]).unsqueeze(-1)
-            freq_filt = 10 ** (freq_filt / 20)
-        return features * freq_filt
-
-    else:
-        return features
