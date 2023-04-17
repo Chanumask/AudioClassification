@@ -23,42 +23,42 @@ HYPERPARAMS_ESC50 = {
     'init_stride': [2],
     'weight_decay': [1e-3],
     'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    'ema': [True],
+    'ema': [False],
     'spec_aug': [False],
     'mask_prob': [0],
-    'comment': ["ema"]
+    'comment': ["adamw"]
 }
 
 HYPERPARAMS_MUSIC = {
-    'learning_rate': [2e-4],
+    'learning_rate': [1e-4],
     'rrc': [False],
     'rlf': [False],
     'dual_patchnorm': [False],
-    'mixup': [False],  # only 1 value possible atm
+    'mixup': [True],  # only 1 value possible atm
     'init_kernel_size': [3],
     'init_stride': [2],
-    'weight_decay': [1e-3],
+    'weight_decay': [1e-2],
     'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    'ema': [True],
+    'ema': [False],
     'spec_aug': [False],
     'mask_prob': [0],
-    'comment': ["ema"],
+    'comment': ["mixup"],
 }
 
 HYPERPARAMS_PRIMATES = {
     'learning_rate': [1e-4],
     'rrc': [False],
     'rlf': [False],
-    'dual_patchnorm': [True],
+    'dual_patchnorm': [False],
     'mixup': [False],  # only 1 value possible atm
     'init_kernel_size': [3],
     'init_stride': [2],
-    'weight_decay': [1e-3],
-    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    'weight_decay': [1e-2],
+    'seed': [1, 2, 3, 4, 5, 6, 7, 8, 9],
     'ema': [False],
     'spec_aug': [False],
     'mask_prob': [0],
-    'comment': ["dual_patchnorm"]
+    'comment': ["adamw"]
 }
 
 # General
@@ -67,7 +67,7 @@ ONLY_TABULATE = False
 ONLY_PLOT_EXAMPLE = False
 MAJORITY_VOTE = False
 AVG_SEEDS = False
-BARPLOT_SETTING = "baseline"
+BARPLOT_SETTING = ["baseline", "rlf", "rrc", "proper_cosine"]
 
 USE_MAX_MODEL = False
 PLOT_RES = True
@@ -76,7 +76,7 @@ UPDATE_INTERVAL = 1  # every x Epochs
 CONF_MATRIX = False
 
 SAVE_DATA = True
-SAVE_PATH = "10seeds//ema"
+SAVE_PATH = "10seeds//adamw"
 SAVE_MAX_MODEL = True
 SAVE_ENSEMBLE = False
 ENSEMBLE_NAME = "final_results"

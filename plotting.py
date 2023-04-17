@@ -296,7 +296,7 @@ def tabulate_data(filepath):
     # iterate over data
     for i in range(0, len(data), 4):
         params, acc, uar, seed = data[i], data[i + 1], data[i + 2], data[i + 3]
-        lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, ema, spec_aug, comment = params
+        lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, ema, spec_aug, mask_prob, comment = params
 
         # get the results values, add a new row to the DataFrame
         df.loc[i // 2] = [comment, acc, uar, seed, dual_patchnorm, rcc, rlf, mixup, spec_aug, init_kernel_size,
@@ -343,7 +343,7 @@ def average10seeds():
 
                 results.append({
                     'Setting': setting,
-                    'File Name': file_name,
+                    'File Name': file_name.split(".")[0],
                     'Avg. Accuracy': avg_accuracy,
                     'Avg. UAR': avg_uar
                 })
@@ -363,14 +363,29 @@ def average10seeds():
     return df
 
 
-def bar_plot_averages(df, setting):
-    plt.figure(figsize=(10, 7))
-    plt.title(f"Average Accuracies for {BARPLOT_SETTING} settings")
-    plt.xlabel("Datasets")
-    plt.ylabel("Accuracy")
+def bar_plot_averages(df, settings):
+    accuracies = {}
+    for setting in settings:
+        accuracies[setting] = []
+        for file_name in df['File Name'].unique():
+            avg_accuracy = df[(df['Setting'] == setting) & (df['File Name'] == file_name)]['Avg. Accuracy'].values[0]
+            accuracies[setting].append(avg_accuracy)
 
-    barWidth = 0.2
-    plt.bar(df[(df['Setting'] == setting)]['File Name'], df[(df['Setting'] == setting)]['Avg. Accuracy'],
-            color='royalblue', width=barWidth, label='music')
+    num_datasets = len(df['File Name'].unique())
+    barWidth = 0.8 / len(settings)
+
+    plt.figure(figsize=(10, 7))
+    xpos = np.arange(num_datasets)
+
+    for i, setting in enumerate(settings):
+        plt.bar(xpos + i * barWidth, accuracies[setting], color=plt.cm.tab20(i), width=barWidth,
+                label=setting.title())
+        for x, y in zip(xpos + i * barWidth, accuracies[setting]):
+            plt.text(x, y, str(round(y, 2)), ha='center', va='bottom')
+
+    plt.xticks(xpos + barWidth * len(settings) / 2 - 0.4, df['File Name'].unique())
+    plt.xlabel('Datasets')
+    plt.ylabel('Accuracy')
+    plt.title(f'Average Accuracies for {", ".join([s.title() for s in settings])} Settings')
+    plt.legend(loc='lower right')
     plt.show()
-    return 0

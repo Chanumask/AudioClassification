@@ -211,11 +211,11 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
             my_metaformer = my_metaformer.to(device)
 
         log.info(
-            f"Training Cycle {(len(hyperparam_combinations) * current_seed) + i} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
+            f"Training Cycle {(len(hyperparam_combinations) * current_seed) + (i+1)} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
 
         criterion = nn.CrossEntropyLoss()
         training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo,
-                                 iteration=[(len(hyperparam_combinations) * current_seed) + i,
+                                 iteration=[(len(hyperparam_combinations) * current_seed) + (i+1),
                                             len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])])
 
         max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
@@ -298,6 +298,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
                 # print("MIXING")
                 x, y = mixup(x, y)
                 y = y.softmax(-1)
+                # plotting.plot_spectrogram(x[0].squeeze())
             if hyperparameters[1]:  # RANDOM_RESIZE_CROP
                 resize_cropper = RandomResizeCrop()
                 x = resize_cropper(x)
@@ -480,8 +481,8 @@ if __name__ == "__main__":
         quit()
     if AVG_SEEDS:
         df = plotting.average10seeds()
-        plotting.bar_plot_averages(df, BARPLOT_SETTING)
         print(df)
+        plotting.bar_plot_averages(df, BARPLOT_SETTING)
         quit()
 
     dataset_hyperparameters = setup_parameters()
@@ -497,4 +498,4 @@ if __name__ == "__main__":
 
         filename = f"results//{SAVE_PATH}//{DATASET}.json"
         # filename = f"results//ensemble_results_{DATASET}_{ENSEMBLE_NAME}.json"
-        train_with_hyperparams(dataset_hyperparameters, num_classes, filename, current_seed=(i + 1))
+        train_with_hyperparams(dataset_hyperparameters, num_classes, filename, current_seed=i)

@@ -238,7 +238,7 @@ class MixupBYOLA(nn.Module):
         return format_string
 
 
-def mixup(x, y, alpha=1.0):
+def mixup(x, y, alpha=0.2):  # try alpha 1.0
     # Sample lambda from beta distribution
     lam = np.random.beta(alpha, alpha, size=x.size()[0])
 
