@@ -274,7 +274,7 @@ ENSEMBLE_NAME = "300 final"
 
 # Training Loop
 BATCH_SIZE = 32  # 32, 64
-EPOCHS = 1  # 300
+EPOCHS = 80  # 300
 LR_WARUMUP = True
 COSINE = True
 
