@@ -414,7 +414,7 @@ def load_ensemble(models_dir):
 
 def predict_ensemble(ensemble_models):
     pl.seed_everything(seed=1)
-    training_data, validation_data, num_categories = get_data()
+    training_data, validation_data, num_categories = get_data(param_iteration)
     training_loader, validation_loader = get_data_loaders(training_data, validation_data)
     predictions = []
     labels = []
@@ -486,21 +486,21 @@ if __name__ == "__main__":
         quit()
 
     dataset_hyperparameters = setup_parameters()
-
-    if MAJORITY_VOTE:
-        ensemble_path = f"ensemble_models/{DATASET}/{ENSEMBLE_NAME}"
-        log.info(f"Majority voting {DATASET} Dataset. Using Ensemble in {ensemble_path}")
-        models = load_ensemble(ensemble_path)
-        df = predict_ensemble(models)
-        print(df.head())
-        accuracy = (df['labels'] == df['predictions']).sum() / len(df)
-        uar = balanced_accuracy_score(df['labels'], df['predictions'])  # test
-        log.info(f"Voting Ensemble's accuracy: {accuracy}")
-        quit()
-
-    for i, param_iteration in enumerate(dataset_hyperparameters):
+    for a, param_iteration in enumerate(dataset_hyperparameters):
         log.info("---------------------------------------------------------------------------------------")
-        log.info(f"Running Hyperparameter iteration {i+1}/ {len(dataset_hyperparameters)}")
+        log.info(f"Running Hyperparameter iteration {a+1}/ {len(dataset_hyperparameters)}")
+
+        if MAJORITY_VOTE:
+            ensemble_path = f"ensemble_models/{DATASET}/{ENSEMBLE_NAME}"
+            log.info(f"Majority voting {DATASET} Dataset. Using Ensemble in {ensemble_path}")
+            models = load_ensemble(ensemble_path)
+            df = predict_ensemble(models)
+            print(df.head())
+            accuracy = (df['labels'] == df['predictions']).sum() / len(df)
+            uar = balanced_accuracy_score(df['labels'], df['predictions'])  # test
+            log.info(f"Voting Ensemble's accuracy: {accuracy}")
+            quit()
+
         for i, seed in enumerate(param_iteration['seed']):
             log.info(
                 f"Training {len(param_iteration['seed'])} different Seeds. Currently ({i + 1}/{len(param_iteration['seed'])})")

@@ -149,21 +149,6 @@ HYPERPARAMS_MUSIC = [
     }
 ]
 
-# HYPERPARAMS_PRIMATES = {
-#     'learning_rate': [1e-4],
-#     'random resize crop': [True],
-#     'random linear fade': [False],
-#     'dual patchnorm': [False],
-#     'mixup': [False],  # only 1 value possible atm
-#     'init_kernel_size': [3],
-#     'init_stride': [2],
-#     'weight_decay': [1e-2],  # 1e-2
-#     'seed': [4, 5, 6, 7, 8, 9],
-#     'ema': [True],
-#     'spec_aug': [False],
-#     'mask_prob': [0],
-#     'comment': ["300"]
-# }
 HYPERPARAMS_PRIMATES = [
     {
         'learning_rate': [1e-4],
@@ -173,80 +158,104 @@ HYPERPARAMS_PRIMATES = [
         'mixup': [False],  # only 1 value possible atm
         'init_kernel_size': [3],
         'init_stride': [2],
-        'weight_decay': [1e-2],
-        'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'ema': [False],
-        'spec_aug': [False],
-        'mask_prob': [0],
-        'norm': ["bn"],
-        'num mem vecs': [0],
-        'improve locality': [False],
-        'scale value': [1.0],
-        'trainable scale': [False],
-        'l2': [False],
-        'comment': ["batchnorm"]
-    }, {
-        'learning_rate': [1e-4],
-        'random resize crop': [True],
-        'random linear fade': [False],
-        'dual patchnorm': [False],
-        'mixup': [False],  # only 1 value possible atm
-        'init_kernel_size': [3],
-        'init_stride': [2],
-        'weight_decay': [1e-2],
-        'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'ema': [False],
-        'spec_aug': [False],
-        'mask_prob': [0],
-        'norm': ["ln"],
-        'num mem vecs': [32],
-        'improve locality': [False],
-        'scale value': [1.0],
-        'trainable scale': [False],
-        'l2': [False],
-        'comment': ["num mem vecs"]
-    }, {
-        'learning_rate': [1e-4],
-        'random resize crop': [True],
-        'random linear fade': [False],
-        'dual patchnorm': [False],
-        'mixup': [False],  # only 1 value possible atm
-        'init_kernel_size': [3],
-        'init_stride': [2],
-        'weight_decay': [1e-2],
-        'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'ema': [False],
-        'spec_aug': [False],
-        'mask_prob': [0],
-        'norm': ["ln"],
-        'num mem vecs': [0],
-        'improve locality': [True],
-        'scale value': [1.0],
-        'trainable scale': [False],
-        'l2': [False],
-        'comment': ["improve locality"]
-    }, {
-        'learning_rate': [1e-4],
-        'random resize crop': [True],
-        'random linear fade': [False],
-        'dual patchnorm': [False],
-        'mixup': [False],  # only 1 value possible atm
-        'init_kernel_size': [3],
-        'init_stride': [2],
-        'weight_decay': [1e-2],
-        'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'ema': [False],
+        'weight_decay': [1e-2],  # 1e-2
+        'seed': [5, 6, 7, 8, 9],
+        'ema': [True],
         'spec_aug': [False],
         'mask_prob': [0],
         'norm': ["ln"],
         'num mem vecs': [0],
         'improve locality': [False],
-        'scale value': [8.0],
-        'trainable scale': [True],
-        'l2': [True],
-        'comment': ["together"]
-    },
+        'scale value': [1.0],
+        'trainable scale': [False],
+        'l2': [False],
+        'comment': ["300"]
+    }
 ]
+
+# HYPERPARAMS_PRIMATES = [
+#     {
+#         'learning_rate': [1e-4],
+#         'random resize crop': [True],
+#         'random linear fade': [False],
+#         'dual patchnorm': [False],
+#         'mixup': [False],  # only 1 value possible atm
+#         'init_kernel_size': [3],
+#         'init_stride': [2],
+#         'weight_decay': [1e-2],
+#         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+#         'ema': [False],
+#         'spec_aug': [False],
+#         'mask_prob': [0],
+#         'norm': ["bn"],
+#         'num mem vecs': [0],
+#         'improve locality': [False],
+#         'scale value': [1.0],
+#         'trainable scale': [False],
+#         'l2': [False],
+#         'comment': ["batchnorm"]
+#     }, {
+#         'learning_rate': [1e-4],
+#         'random resize crop': [True],
+#         'random linear fade': [False],
+#         'dual patchnorm': [False],
+#         'mixup': [False],  # only 1 value possible atm
+#         'init_kernel_size': [3],
+#         'init_stride': [2],
+#         'weight_decay': [1e-2],
+#         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+#         'ema': [False],
+#         'spec_aug': [False],
+#         'mask_prob': [0],
+#         'norm': ["ln"],
+#         'num mem vecs': [32],
+#         'improve locality': [False],
+#         'scale value': [1.0],
+#         'trainable scale': [False],
+#         'l2': [False],
+#         'comment': ["num mem vecs"]
+#     }, {
+#         'learning_rate': [1e-4],
+#         'random resize crop': [True],
+#         'random linear fade': [False],
+#         'dual patchnorm': [False],
+#         'mixup': [False],  # only 1 value possible atm
+#         'init_kernel_size': [3],
+#         'init_stride': [2],
+#         'weight_decay': [1e-2],
+#         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+#         'ema': [False],
+#         'spec_aug': [False],
+#         'mask_prob': [0],
+#         'norm': ["ln"],
+#         'num mem vecs': [0],
+#         'improve locality': [True],
+#         'scale value': [1.0],
+#         'trainable scale': [False],
+#         'l2': [False],
+#         'comment': ["improve locality"]
+#     }, {
+#         'learning_rate': [1e-4],
+#         'random resize crop': [True],
+#         'random linear fade': [False],
+#         'dual patchnorm': [False],
+#         'mixup': [False],  # only 1 value possible atm
+#         'init_kernel_size': [3],
+#         'init_stride': [2],
+#         'weight_decay': [1e-2],
+#         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+#         'ema': [False],
+#         'spec_aug': [False],
+#         'mask_prob': [0],
+#         'norm': ["ln"],
+#         'num mem vecs': [0],
+#         'improve locality': [False],
+#         'scale value': [8.0],
+#         'trainable scale': [True],
+#         'l2': [True],
+#         'comment': ["together"]
+#     },
+# ]
 
 # General
 DATASET = "PRIMATES"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
@@ -274,7 +283,7 @@ ENSEMBLE_NAME = "300 final"
 
 # Training Loop
 BATCH_SIZE = 32  # 32, 64
-EPOCHS = 1  # 300
+EPOCHS = 300  # 300
 LR_WARUMUP = True
 COSINE = True
 
