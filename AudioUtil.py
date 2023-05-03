@@ -238,7 +238,7 @@ class MixupBYOLA(nn.Module):
         return format_string
 
 
-def mixup(x, y, alpha=0.2):  # try alpha 1.0
+def mixup(x, y, classes, alpha=0.2):  # try alpha 1.0
     # Sample lambda from beta distribution
     lam = np.random.beta(alpha, alpha, size=x.size()[0])
 
@@ -251,7 +251,7 @@ def mixup(x, y, alpha=0.2):  # try alpha 1.0
     y2 = y[index]
 
     # One-hot encode labels
-    num_classes = y.max() + 1
+    num_classes = classes
     y_onehot = torch.zeros((batch_size, num_classes))
     y2_onehot = torch.zeros((batch_size, num_classes))
     for i in range(batch_size):

@@ -53,9 +53,9 @@ def initiate_logging():
     return log
 
 
-def get_data():
+def get_data(param_iteration):
     if not MAJORITY_VOTE:
-        specaug = dataset_hyperparameters['spec_aug'][0]
+        specaug = param_iteration['spec_aug'][0]
     else:
         specaug = None
     global num_classes, categories, train_data, valid_data
@@ -64,9 +64,9 @@ def get_data():
         x_train, y_train, categories = load_speech_dataset(SPEECH_PATH_TRAIN)
         x_valid, y_valid, _ = load_speech_dataset(SPEECH_PATH_VALID)
         train_data = SpeechDataset("training", x_train, y_train, categories, specaug=specaug,
-                                   mask_prob=dataset_hyperparameters['mask_prob'][0])
+                                   mask_prob=param_iteration['mask_prob'][0])
         valid_data = SpeechDataset("validation", x_valid, y_valid, categories, specaug=False,
-                                   mask_prob=dataset_hyperparameters['mask_prob'][0])
+                                   mask_prob=param_iteration['mask_prob'][0])
 
     elif DATASET == "ESC50":
         num_classes = 50
@@ -79,18 +79,18 @@ def get_data():
         valid_df = df[df['fold'] == 1]
 
         train_data = ESC50Data("training", audio_path, train_df, 'filename', 'category', specaug=specaug,
-                               mask_prob=dataset_hyperparameters['mask_prob'][0])
+                               mask_prob=param_iteration['mask_prob'][0])
         valid_data = ESC50Data("validation", audio_path, valid_df, 'filename', 'category', specaug=False,
-                               mask_prob=dataset_hyperparameters['mask_prob'][0])
+                               mask_prob=param_iteration['mask_prob'][0])
 
     elif DATASET == "MUSIC":
         num_classes = 10
         x_train, y_train, categories = load_music_dataset(MUSIC_PATH_TRAIN)
         x_valid, y_valid, _ = load_music_dataset(MUSIC_PATH_VALID)
         train_data = MusicDataset("training", x_train, y_train, categories, specaug=specaug,
-                                  mask_prob=dataset_hyperparameters['mask_prob'][0])
+                                  mask_prob=param_iteration['mask_prob'][0])
         valid_data = MusicDataset("validation", x_valid, y_valid, categories, specaug=False,
-                                  mask_prob=dataset_hyperparameters['mask_prob'][0])
+                                  mask_prob=param_iteration['mask_prob'][0])
 
     elif DATASET == "PRIMATES":
         num_classes = 5
@@ -99,9 +99,9 @@ def get_data():
         x_val, y_val, _ = load_primates_dataset(PRIMATES_CSV_VALID)
 
         train_data = PrimatesDataset("training", x_train, y_train, categories, specaug=specaug,
-                                     mask_prob=dataset_hyperparameters['mask_prob'][0])
+                                     mask_prob=param_iteration['mask_prob'][0])
         valid_data = PrimatesDataset("validation", x_val, y_val, categories, specaug=False,
-                                     mask_prob=dataset_hyperparameters['mask_prob'][0])
+                                     mask_prob=param_iteration['mask_prob'][0])
 
     return train_data, valid_data, num_classes
 
@@ -186,7 +186,7 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
                 init_stride=combo[6],
                 # init_stride=2,
                 drop_path_rate=0.5,  # 0, 0.25 worse
-                norm='ln',  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
+                norm=combo[11],  # ln, bn or rms (layernorm, batchnorm or rmsnorm)
                 use_dual_patchnorm=combo[3],  # norm on both sides for the patch embedding
                 use_pos_emb=True,  # use 2d sinusodial positional embeddings
                 head_dim=32,
@@ -194,15 +194,15 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
                 attn_dropout=0.1,
                 proj_dropout=0.1,
                 patchmasking_prob=0,  # worse: 0.05 replace 5% of the initial tokens with a </mask> token
-                scale_value=1.0,  # scale attention logits by this value
-                trainable_scale=False,  # if scale can be trained
-                num_mem_vecs=0,  # additional memory vectors (in the attention layers)  # 16,32
+                scale_value=combo[14],  # scale attention logits by this value
+                trainable_scale=combo[15],  # if scale can be trained
+                num_mem_vecs=combo[12],  # additional memory vectors (in the attention layers)  # 16,32
                 sparse_topk=0,  # sparsify - keep only top k values (in the attention layers)
-                l2=False,  # l2 norm on tokens (in the attention layers)
-                improve_locality=False,  # remove attention on own token
+                l2=combo[16],  # l2 norm on tokens (in the attention layers)
+                improve_locality=combo[13],  # remove attention on own token
                 use_starreglu=False,  # use gated StarReLU
                 use_seqpool=True,
-                use_grn_mlp=False  # False
+                use_grn_mlp=False
             )
             my_metaformer = my_metaformer.to(device)
         else:
@@ -211,12 +211,14 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
             my_metaformer = my_metaformer.to(device)
 
         log.info(
-            f"Training Cycle {(len(hyperparam_combinations) * current_seed) + (i+1)} of {len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])}")
+            f"Training Cycle {(len(hyperparam_combinations) * current_seed) + (i+1)} of {len(hyperparam_combinations) * len(param_iteration['seed'])}")
 
         criterion = nn.CrossEntropyLoss()
+
         training_results = train(my_metaformer, criterion, train_loader, valid_loader, combo,
-                                 iteration=[(len(hyperparam_combinations) * current_seed) + (i+1),
-                                            len(hyperparam_combinations) * len(dataset_hyperparameters['seed'])])
+                                 iteration=[(len(hyperparam_combinations) * current_seed) + (i + 1),
+                                            len(hyperparam_combinations) * len(param_iteration['seed'])],
+                                 classes=classes_count)
 
         max_acc = np.max([elem['avg_valid_acc'] for elem in training_results])
         max_uar = np.max([elem['uar'] for elem in training_results])
@@ -269,7 +271,7 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
             plotting.plot_results(training_results)
 
 
-def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
+def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration, classes):
     start_time = time.time()
 
     res_array = []
@@ -292,11 +294,12 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
         model.train()
         batch_losses = []
 
-        for i, data in tqdm(enumerate(train_loader), desc='Epoch progress', ncols=33):
+        for i, data in tqdm(enumerate(train_loader), desc='Epoch training', ncols=33):
             x, y = data
             if hyperparameters[4]:  # MIXUP
                 # print("MIXING")
-                x, y = mixup(x, y)
+                # plotting.plot_spectrogram(x[0].squeeze())
+                x, y = mixup(x, y, classes)
                 y = y.softmax(-1)
                 # plotting.plot_spectrogram(x[0].squeeze())
             if hyperparameters[1]:  # RANDOM_RESIZE_CROP
@@ -307,14 +310,18 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
                 x = linear_fader(x)
             optimizer.zero_grad()
             x = x.to(device, dtype=torch.float32)
-            y = y.to(device, dtype=torch.long)
+            if hyperparameters[4]:  # MIXUP
+                y = y.to(device, dtype=torch.float32)
+            else:
+                y = y.to(device, dtype=torch.long)
             y_hat = model(x)
-            # print(y)
+            # print(y.shape)
+            # print(y_hat.shape)
             loss = loss_fn(y_hat, y)
             loss.backward()
             batch_losses.append(loss.item())
             optimizer.step()
-            if hyperparameters[8]:  # dseed deleted, everything after -1
+            if hyperparameters[8]:  # seed deleted, everything after -1
                 ema.update()
         if LR_WARUMUP and epoch < (EPOCHS / 10):  # /20
             scheduler_warmup.step()
@@ -324,7 +331,7 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration):
         train_loss = np.mean(train_losses[-1])
         model.eval()
         batch_losses, trace_y, trace_yhat, lrs = [], [], [], []
-        for i, data in enumerate(val_loader):
+        for i, data in tqdm(enumerate(val_loader), desc='Epoch evaluation', ncols=35):
             x, y = data
             x = x.to(device, dtype=torch.float32)
             y = y.to(device, dtype=torch.long)
@@ -465,10 +472,21 @@ if __name__ == "__main__":
         log.info(f"Here are the results ({filename}):")
         plotting.tabulate_data(filename)
         quit()
+
     if ONLY_PLOT_EXAMPLE:
         plotted_path = plotting.plot_all(DATASET)
         log.info(f"Plotted Data from path: {plotted_path}")
         quit()
+
+    if AVG_SEEDS:
+        df = plotting.average10seeds()
+        # print(df[['Setting', 'File Name', 'Avg. Accuracy', 'Avg. improvement']])
+        print(df.loc[df['File Name'] == "MUSIC", ['Setting', 'File Name', 'Avg. Accuracy', 'Avg. improvement']])
+        plotting.bar_plot_averages(df, BARPLOT_SETTING)
+        quit()
+
+    dataset_hyperparameters = setup_parameters()
+
     if MAJORITY_VOTE:
         ensemble_path = f"ensemble_models/{DATASET}/{ENSEMBLE_NAME}"
         log.info(f"Majority voting {DATASET} Dataset. Using Ensemble in {ensemble_path}")
@@ -479,23 +497,17 @@ if __name__ == "__main__":
         uar = balanced_accuracy_score(df['labels'], df['predictions'])  # test
         log.info(f"Voting Ensemble's accuracy: {accuracy}")
         quit()
-    if AVG_SEEDS:
-        df = plotting.average10seeds()
-        print(df)
-        plotting.bar_plot_averages(df, BARPLOT_SETTING)
-        quit()
 
-    dataset_hyperparameters = setup_parameters()
+    for param_iteration in dataset_hyperparameters:
+        for i, seed in enumerate(param_iteration['seed']):
+            log.info(
+                f"Training {len(param_iteration['seed'])} different Seeds. Currently ({i + 1}/{len(param_iteration['seed'])})")
+            pl.seed_everything(seed=seed)
 
-    for i, seed in enumerate(dataset_hyperparameters['seed']):
-        log.info(
-            f"Training {len(dataset_hyperparameters['seed'])} different Seeds. Currently ({i + 1}/{len(dataset_hyperparameters['seed'])})")
-        pl.seed_everything(seed=seed)
+            log.info(f'Loading and preprocessing {DATASET} datasets...')
+            train_data, valid_data, num_classes = get_data(param_iteration)
+            train_loader, valid_loader = get_data_loaders(train_data, valid_data)
 
-        log.info(f'Loading and preprocessing {DATASET} datasets...')
-        train_data, valid_data, num_classes = get_data()
-        train_loader, valid_loader = get_data_loaders(train_data, valid_data)
-
-        filename = f"results//{SAVE_PATH}//{DATASET}.json"
-        # filename = f"results//ensemble_results_{DATASET}_{ENSEMBLE_NAME}.json"
-        train_with_hyperparams(dataset_hyperparameters, num_classes, filename, current_seed=i)
+            filename = f"results//{SAVE_PATH}//{DATASET}.json"
+            # filename = f"results//ensemble_results_{DATASET}_{ENSEMBLE_NAME}.json"
+            train_with_hyperparams(param_iteration, num_classes, filename, current_seed=i)

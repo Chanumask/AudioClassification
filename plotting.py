@@ -1,6 +1,8 @@
 import json
 import os
 import pickle
+
+import numpy as np
 import seaborn as sns
 
 import librosa
@@ -256,7 +258,7 @@ def plot_results(result_list):
     fig, ax = plt.subplots(5, figsize=(12, 10))
     plt.subplots_adjust(left=0.08, bottom=0.05, right=0.98, top=0.95, wspace=0.4, hspace=0.52)
 
-    label_distance = 5
+    label_distance = 50
 
     for i in range(len(ax)):
         ax[i].set_xticks(range(0, EPOCHS, label_distance))
@@ -289,7 +291,8 @@ def tabulate_data(filepath):
     with open(filepath, 'r') as f:
         data = json.load(f)
     df = pd.DataFrame(
-        columns=["comment", "Max acc", "Max UAR", "seed", "dual patchnorm", "rrc", "rlf", "mixup", "spec_aug",
+        columns=["comment", "Max acc", "Max UAR", "seed", "dual patchnorm", "random resize crop", "random linear fade",
+                 "mixup", "spec_aug",
                  "kernelsize",
                  "stride", "AdamW wd"])
 
@@ -339,37 +342,58 @@ def average10seeds():
                 avg_uar = sum(uars) / len(uars)
                 avg_uar = round(100 * avg_uar, 2)
 
+                if file_name.endswith("PRIMATES.json"):
+                    minimum = min(uars)
+                    maximum = max(uars)
+                else:
+                    minimum = min(accuracies)
+                    maximum = max(accuracies)
+
                 setting = os.path.basename(subdir)
 
                 results.append({
                     'Setting': setting,
                     'File Name': file_name.split(".")[0],
                     'Avg. Accuracy': avg_accuracy,
-                    'Avg. UAR': avg_uar
+                    'Avg. UAR': avg_uar,
+                    'Minimum': minimum,
+                    'Maximum': maximum,
                 })
 
     df = pd.DataFrame(results)
 
     def get_baseline_acc(file_name):
-        baseline_df = df[(df['Setting'] == 'baseline') & (df['File Name'] == file_name)]
+        baseline_df = df[(df['Setting'] == 'no data augmentations') & (df['File Name'] == file_name)]
         if len(baseline_df) > 0:
             return baseline_df.iloc[0]['Avg. Accuracy']
         else:
             return None
 
-    df['acc improvement'] = df['File Name'].apply(get_baseline_acc)
-    df['acc improvement'] = df['Avg. Accuracy'] - df['acc improvement']
+    df['Avg. improvement'] = df['File Name'].apply(get_baseline_acc)
+    df['Avg. improvement'] = df['Avg. Accuracy'] - df['Avg. improvement']
     # print(df[(df['File Name'] == 'MUSIC.json')])
     return df
 
 
 def bar_plot_averages(df, settings):
-    accuracies = {}
+    results = {}
     for setting in settings:
-        accuracies[setting] = []
+        results[setting] = {'acc': [], 'min': [], 'max': []}  # initialize empty dictionary for each setting
         for file_name in df['File Name'].unique():
-            avg_accuracy = df[(df['Setting'] == setting) & (df['File Name'] == file_name)]['Avg. Accuracy'].values[0]
-            accuracies[setting].append(avg_accuracy)
+            if file_name == "PRIMATES":
+                avg = df[(df['Setting'] == setting) & (df['File Name'] == file_name)]['Avg. UAR'].values[
+                    0]
+            else:
+                avg = df[(df['Setting'] == setting) & (df['File Name'] == file_name)]['Avg. Accuracy'].values[
+                    0]
+            results[setting]['acc'].append(avg)
+            minimum = avg - round(df[(df['Setting'] == setting) & (df['File Name'] == file_name)]['Minimum'].values[
+                                0] * 100, 1)
+            maximum = round(df[(df['Setting'] == setting) & (df['File Name'] == file_name)]['Maximum'].values[
+                                0] * 100, 1) - avg
+            results[setting]['min'].append(minimum)
+            results[setting]['max'].append(maximum)
+            # print(results[setting])
 
     num_datasets = len(df['File Name'].unique())
     barWidth = 0.8 / len(settings)
@@ -378,14 +402,15 @@ def bar_plot_averages(df, settings):
     xpos = np.arange(num_datasets)
 
     for i, setting in enumerate(settings):
-        plt.bar(xpos + i * barWidth, accuracies[setting], color=plt.cm.tab20(i), width=barWidth,
-                label=setting.title())
-        for x, y in zip(xpos + i * barWidth, accuracies[setting]):
-            plt.text(x, y, str(round(y, 2)), ha='center', va='bottom')
+        yerr = [results[setting]['min'], results[setting]['max']]
+        # print(results[setting]['acc'])
+        plt.bar(xpos + i * barWidth, results[setting]['acc'], color=sns.color_palette("colorblind")[i], width=barWidth,
+                label=setting.title(), yerr = yerr, capsize=5)
+        for w, (x, y) in enumerate(zip(xpos + i * barWidth, results[setting]['acc'])):
+            plt.text(x, y-results[setting]['min'][w]-3, str(round(y, 2)), ha='center', va='bottom')
 
-    plt.xticks(xpos + barWidth * len(settings) / 2 - 0.4, df['File Name'].unique())
-    plt.xlabel('Datasets')
-    plt.ylabel('Accuracy')
-    plt.title(f'Average Accuracies for {", ".join([s.title() for s in settings])} Settings')
+    plt.xticks(xpos + barWidth * len(settings) / 2 - 0.08, df['File Name'].unique())
+    plt.xlabel('Dataset')
+    plt.ylabel('Accuracy/ UAR (%)')
     plt.legend(loc='lower right')
     plt.show()
