@@ -1,0 +1,47 @@
+[
+  [
+    0.0002,
+    true,
+    false,
+    true,
+    true,
+    3,
+    2,
+    0.001,
+    true,
+    false,
+    "normalized"
+  ],
+  0.785,
+  1,
+  [
+    0.0002,
+    true,
+    false,
+    true,
+    true,
+    3,
+    2,
+    0.001,
+    true,
+    false,
+    "no normalization"
+  ],
+  0.7925,
+  1,
+  [
+    0.0002,
+    true,
+    false,
+    true,
+    true,
+    3,
+    2,
+    0.001,
+    true,
+    false,
+    "grn_mlp"
+  ],
+  0.7825,
+  1
+]
