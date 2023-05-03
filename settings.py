@@ -175,7 +175,7 @@ HYPERPARAMS_PRIMATES = [
         'init_stride': [2],
         'weight_decay': [1e-2],
         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'ema': [True],
+        'ema': [False],
         'spec_aug': [False],
         'mask_prob': [0],
         'norm': ["bn"],
@@ -195,7 +195,7 @@ HYPERPARAMS_PRIMATES = [
         'init_stride': [2],
         'weight_decay': [1e-2],
         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'ema': [True],
+        'ema': [False],
         'spec_aug': [False],
         'mask_prob': [0],
         'norm': ["ln"],
@@ -215,7 +215,7 @@ HYPERPARAMS_PRIMATES = [
         'init_stride': [2],
         'weight_decay': [1e-2],
         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'ema': [True],
+        'ema': [False],
         'spec_aug': [False],
         'mask_prob': [0],
         'norm': ["ln"],
@@ -235,7 +235,7 @@ HYPERPARAMS_PRIMATES = [
         'init_stride': [2],
         'weight_decay': [1e-2],
         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        'ema': [True],
+        'ema': [False],
         'spec_aug': [False],
         'mask_prob': [0],
         'norm': ["ln"],
@@ -249,7 +249,7 @@ HYPERPARAMS_PRIMATES = [
 ]
 
 # General
-DATASET = "ESC50"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+DATASET = "PRIMATES"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
 ONLY_TABULATE = False
 ONLY_PLOT_EXAMPLE = False
 MAJORITY_VOTE = False
@@ -261,20 +261,20 @@ BARPLOT_SETTING = ["augs, cosine, adamW", "dual patchnorm", "no sequential pooli
 # BARPLOT_SETTING = ["added EMA", "300"]
 
 USE_MAX_MODEL = False
-PLOT_RES = True
+PLOT_RES = False
 MONITORING = False
 UPDATE_INTERVAL = 1  # every x Epochs
 CONF_MATRIX = False
 
 SAVE_DATA = True
-SAVE_PATH = "10seeds//running primates"
+SAVE_PATH = "10seeds//running esc"
 SAVE_MAX_MODEL = True
 SAVE_ENSEMBLE = False
 ENSEMBLE_NAME = "300 final"
 
 # Training Loop
 BATCH_SIZE = 32  # 32, 64
-EPOCHS = 80  # 300
+EPOCHS = 1  # 300
 LR_WARUMUP = True
 COSINE = True
 

@@ -498,7 +498,9 @@ if __name__ == "__main__":
         log.info(f"Voting Ensemble's accuracy: {accuracy}")
         quit()
 
-    for param_iteration in dataset_hyperparameters:
+    for i, param_iteration in enumerate(dataset_hyperparameters):
+        log.info("---------------------------------------------------------------------------------------")
+        log.info(f"Running Hyperparameter iteration {i+1}/ {len(dataset_hyperparameters)}")
         for i, seed in enumerate(param_iteration['seed']):
             log.info(
                 f"Training {len(param_iteration['seed'])} different Seeds. Currently ({i + 1}/{len(param_iteration['seed'])})")
