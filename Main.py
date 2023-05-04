@@ -190,7 +190,7 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
                 use_dual_patchnorm=combo[3],  # norm on both sides for the patch embedding
                 use_pos_emb=True,  # use 2d sinusodial positional embeddings
                 head_dim=32,
-                num_heads=8,
+                num_heads=4,
                 attn_dropout=0.1,
                 proj_dropout=0.1,
                 patchmasking_prob=0,  # worse: 0.05 replace 5% of the initial tokens with a </mask> token
@@ -202,7 +202,7 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
                 improve_locality=combo[13],  # remove attention on own token
                 use_starreglu=False,  # use gated StarReLU
                 use_seqpool=True,
-                use_grn_mlp=False
+                use_grn_mlp=combo[17]
             )
             my_metaformer = my_metaformer.to(device)
         else:
@@ -481,15 +481,12 @@ if __name__ == "__main__":
     if AVG_SEEDS:
         df = plotting.average10seeds()
         # print(df[['Setting', 'File Name', 'Avg. Accuracy', 'Avg. improvement']])
-        print(df.loc[df['File Name'] == "MUSIC", ['Setting', 'File Name', 'Avg. Accuracy', 'Avg. improvement']])
+        print(df.loc[df['File Name'] == "ESC50", ['Setting', 'File Name', 'Avg. Accuracy', 'Avg. improvement']])
         plotting.bar_plot_averages(df, BARPLOT_SETTING)
         quit()
 
     dataset_hyperparameters = setup_parameters()
     for a, param_iteration in enumerate(dataset_hyperparameters):
-        log.info("---------------------------------------------------------------------------------------")
-        log.info(f"Running Hyperparameter iteration {a+1}/ {len(dataset_hyperparameters)}")
-
         if MAJORITY_VOTE:
             ensemble_path = f"ensemble_models/{DATASET}/{ENSEMBLE_NAME}"
             log.info(f"Majority voting {DATASET} Dataset. Using Ensemble in {ensemble_path}")
@@ -500,6 +497,9 @@ if __name__ == "__main__":
             uar = balanced_accuracy_score(df['labels'], df['predictions'])  # test
             log.info(f"Voting Ensemble's accuracy: {accuracy}")
             quit()
+
+        log.info("---------------------------------------------------------------------------------------")
+        log.info(f"Running Hyperparameter iteration {a + 1}/ {len(dataset_hyperparameters)}")
 
         for i, seed in enumerate(param_iteration['seed']):
             log.info(

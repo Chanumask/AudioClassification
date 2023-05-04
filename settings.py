@@ -13,7 +13,7 @@ HYPERPARAMS_SPEECH = {
     'comment': [""]
 }  # add new hyperparams above the comment entry
 
-# HYPERPARAMS_ESC50 = {
+# HYPERPARAMS_ESC50 = [{
 #     'learning_rate': [2e-4],  # 2
 #     'random resize crop': [True],
 #     'random linear fade': [False],
@@ -23,92 +23,41 @@ HYPERPARAMS_SPEECH = {
 #     'init_stride': [2],
 #     'weight_decay': [1e-3],
 #     'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-#     'ema': [True],
+#     'ema': [False],
 #     'spec_aug': [False],
 #     'mask_prob': [0],
-#     'comment': ["300"]
-# }
-HYPERPARAMS_ESC50 = [{
-    'learning_rate': [2e-4],
-    'random resize crop': [True],
-    'random linear fade': [False],
-    'dual patchnorm': [False],
-    'mixup': [False],  # only 1 value possible atm
-    'init_kernel_size': [3],
-    'init_stride': [2],
-    'weight_decay': [1e-3],
-    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    'ema': [False],
-    'spec_aug': [False],
-    'mask_prob': [0],
-    'norm': ["bn"],
-    'num mem vecs': [0],
-    'improve locality': [False],
-    'scale value': [1.0],
-    'trainable scale': [False],
-    'l2': [False],
-    'comment': ["batchnorm"]
-}, {
-    'learning_rate': [2e-4],
-    'random resize crop': [True],
-    'random linear fade': [False],
-    'dual patchnorm': [False],
-    'mixup': [False],  # only 1 value possible atm
-    'init_kernel_size': [3],
-    'init_stride': [2],
-    'weight_decay': [1e-3],
-    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    'ema': [False],
-    'spec_aug': [False],
-    'mask_prob': [0],
-    'norm': ["ln"],
-    'num mem vecs': [32],
-    'improve locality': [False],
-    'scale value': [1.0],
-    'trainable scale': [False],
-    'l2': [False],
-    'comment': ["num mem vecs"]
-}, {
-    'learning_rate': [2e-4],
-    'random resize crop': [True],
-    'random linear fade': [False],
-    'dual patchnorm': [False],
-    'mixup': [False],  # only 1 value possible atm
-    'init_kernel_size': [3],
-    'init_stride': [2],
-    'weight_decay': [1e-3],
-    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    'ema': [False],
-    'spec_aug': [False],
-    'mask_prob': [0],
-    'norm': ["ln"],
-    'num mem vecs': [0],
-    'improve locality': [True],
-    'scale value': [1.0],
-    'trainable scale': [False],
-    'l2': [False],
-    'comment': ["improve locality"]
-}, {
-    'learning_rate': [2e-4],
-    'random resize crop': [True],
-    'random linear fade': [False],
-    'dual patchnorm': [False],
-    'mixup': [False],  # only 1 value possible atm
-    'init_kernel_size': [3],
-    'init_stride': [2],
-    'weight_decay': [1e-3],
-    'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    'ema': [False],
-    'spec_aug': [False],
-    'mask_prob': [0],
-    'norm': ["ln"],
-    'num mem vecs': [0],
-    'improve locality': [False],
-    'scale value': [8.0],
-    'trainable scale': [True],
-    'l2': [True],
-    'comment': ["together"]
-}, ]
+#     'norm': ["ln"],
+#     'num mem vecs': [0],
+#     'improve locality': [False],
+#     'scale value': [1.0],
+#     'trainable scale': [False],
+#     'l2': [False],
+#     'use grn mlp': [False],
+#     'comment': ["augs cosne adamw"]}]
+HYPERPARAMS_ESC50 = [
+    {
+        'learning_rate': [2e-4],
+        'random resize crop': [True],
+        'random linear fade': [False],
+        'dual patchnorm': [False],
+        'mixup': [False],  # only 1 value possible atm
+        'init_kernel_size': [3],
+        'init_stride': [2],
+        'weight_decay': [1e-3],
+        'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        'ema': [False],
+        'spec_aug': [False],
+        'mask_prob': [0],
+        'norm': ["bn"],
+        'num mem vecs': [0],
+        'improve locality': [False],
+        'scale value': [1.0],
+        'trainable scale': [False],
+        'l2': [False],
+        'use grn mlp': [True],
+        'comment': ["grn mlp"]
+    }
+]
 
 # HYPERPARAMS_MUSIC = {
 #     'learning_rate': [2e-4],
@@ -123,6 +72,13 @@ HYPERPARAMS_ESC50 = [{
 #     'ema': [True],
 #     'spec_aug': [False],
 #     'mask_prob': [0],
+#     'norm': ["ln"],
+#     'num mem vecs': [0],
+#     'improve locality': [False],
+#     'scale value': [1.0],
+#     'trainable scale': [False],
+#     'l2': [False],
+#     'use grn mlp': [False],
 #     'comment': ["300"],
 # }
 HYPERPARAMS_MUSIC = [
@@ -135,7 +91,7 @@ HYPERPARAMS_MUSIC = [
         'init_kernel_size': [3],
         'init_stride': [2],
         'weight_decay': [1e-2],
-        'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        'seed': [2, 3, 4, 5, 6, 7, 8, 9],
         'ema': [False],
         'spec_aug': [False],
         'mask_prob': [0],
@@ -145,7 +101,8 @@ HYPERPARAMS_MUSIC = [
         'scale value': [1.0],
         'trainable scale': [False],
         'l2': [False],
-        'comment': ["test"],
+        'use grn mlp': [True],
+        'comment': ["grn mlp"],
     }
 ]
 
@@ -158,8 +115,8 @@ HYPERPARAMS_PRIMATES = [
         'mixup': [False],  # only 1 value possible atm
         'init_kernel_size': [3],
         'init_stride': [2],
-        'weight_decay': [1e-2],  # 1e-2
-        'seed': [5, 6, 7, 8, 9],
+        'weight_decay': [1e-2],
+        'seed': [7, 8, 9],
         'ema': [True],
         'spec_aug': [False],
         'mask_prob': [0],
@@ -169,6 +126,7 @@ HYPERPARAMS_PRIMATES = [
         'scale value': [1.0],
         'trainable scale': [False],
         'l2': [False],
+        'use grn mlp': [False],
         'comment': ["300"]
     }
 ]
@@ -193,6 +151,7 @@ HYPERPARAMS_PRIMATES = [
 #         'scale value': [1.0],
 #         'trainable scale': [False],
 #         'l2': [False],
+#         'use grn mlp': [False],
 #         'comment': ["batchnorm"]
 #     }, {
 #         'learning_rate': [1e-4],
@@ -213,6 +172,7 @@ HYPERPARAMS_PRIMATES = [
 #         'scale value': [1.0],
 #         'trainable scale': [False],
 #         'l2': [False],
+#         'use grn mlp': [False],
 #         'comment': ["num mem vecs"]
 #     }, {
 #         'learning_rate': [1e-4],
@@ -233,6 +193,7 @@ HYPERPARAMS_PRIMATES = [
 #         'scale value': [1.0],
 #         'trainable scale': [False],
 #         'l2': [False],
+#         'use grn mlp': [False],
 #         'comment': ["improve locality"]
 #     }, {
 #         'learning_rate': [1e-4],
@@ -253,20 +214,42 @@ HYPERPARAMS_PRIMATES = [
 #         'scale value': [8.0],
 #         'trainable scale': [True],
 #         'l2': [True],
+#         'use grn mlp': [False],
 #         'comment': ["together"]
+#     }, {
+#         'learning_rate': [1e-4],
+#         'random resize crop': [True],
+#         'random linear fade': [False],
+#         'dual patchnorm': [False],
+#         'mixup': [False],  # only 1 value possible atm
+#         'init_kernel_size': [3],
+#         'init_stride': [2],
+#         'weight_decay': [1e-2],
+#         'seed': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+#         'ema': [False],
+#         'spec_aug': [False],
+#         'mask_prob': [0],
+#         'norm': ["ln"],
+#         'num mem vecs': [0],
+#         'improve locality': [False],
+#         'scale value': [1.0],
+#         'trainable scale': [False],
+#         'l2': [False],
+#         'use grn mlp': [True],
+#         'comment': ["grn mlp"]
 #     },
 # ]
 
 # General
-DATASET = "PRIMATES"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+DATASET = "MUSIC"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
 ONLY_TABULATE = False
 ONLY_PLOT_EXAMPLE = False
 MAJORITY_VOTE = False
 AVG_SEEDS = False
 # BARPLOT_SETTING = ["no data augmentations", "random resize crop", "random linear fade", "mixup", "augmentations combined"]
 # BARPLOT_SETTING = ["no data augmentations", "cosine annealing", "optimized adamW", "best augmentations", "augs, cosine, adamW"]
-BARPLOT_SETTING = ["augs, cosine, adamW", "dual patchnorm", "no sequential pooling", "num heads 4"]
-# BARPLOT_SETTING = ["no data augmentations", "only EMA", "best model configuration", "added EMA"]
+# BARPLOT_SETTING = ["augs, cosine, adamW", "dual patchnorm", "no sequential pooling", "num heads 4"]
+BARPLOT_SETTING = ["no data augmentations", "only EMA", "best model configuration", "added EMA"]
 # BARPLOT_SETTING = ["added EMA", "300"]
 
 USE_MAX_MODEL = False
@@ -276,14 +259,14 @@ UPDATE_INTERVAL = 1  # every x Epochs
 CONF_MATRIX = False
 
 SAVE_DATA = True
-SAVE_PATH = "10seeds//running esc"
+SAVE_PATH = "10seeds//grn mlp"
 SAVE_MAX_MODEL = True
 SAVE_ENSEMBLE = False
 ENSEMBLE_NAME = "300 final"
 
 # Training Loop
 BATCH_SIZE = 32  # 32, 64
-EPOCHS = 300  # 300
+EPOCHS = 80  # 300
 LR_WARUMUP = True
 COSINE = True
 
