@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from sklearn.metrics import confusion_matrix, f1_score, balanced_accuracy_score
 import matplotlib.pyplot as plt

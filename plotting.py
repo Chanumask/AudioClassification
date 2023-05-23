@@ -1,18 +1,15 @@
 import json
-import os
 import pickle
 
-import numpy as np
+import pandas as pd
 import seaborn as sns
 
-import librosa
 import librosa.display
 import matplotlib.pyplot as plt
 from matplotlib import pylab
 
 from AudioUtil import *
 from settings import *
-from metrics import get_max_acc
 
 
 def save_object(obj):
@@ -79,7 +76,7 @@ def plot_waveform(waveform, sample_rate, title="Waveform", xlim=None, ylim=None)
     return plt
 
 
-def plotPowerSpectrum(signal):
+def plot_power_spectrum(signal):
     fft = np.fft.fft(signal)  # Fourier transform
     spectrum = np.abs(fft)
     f = np.linspace(0, SAMPLE_RATE, len(spectrum))
@@ -93,7 +90,7 @@ def plotPowerSpectrum(signal):
     return plt
 
 
-def plotSpectrogram(signal):
+def plot_spec(signal):
     # signal = signal.numpy()
     stft = librosa.stft(signal, n_fft=NFFT, hop_length=HOPLENGTH)
     spectrogram = np.abs(stft)
@@ -106,7 +103,7 @@ def plotSpectrogram(signal):
     return plt
 
 
-def plotDBSpectrogram(signal):
+def plot_db_spectrogram(signal):
     hop_length = 512
     n_fft = 2048
     stft = librosa.stft(signal, n_fft=n_fft, hop_length=hop_length)
@@ -120,7 +117,7 @@ def plotDBSpectrogram(signal):
     return plt
 
 
-def plotMFCCs(signal):
+def plot_mfccs(signal):
     hop_length = 512
     n_fft = 2048
     # extract 13 Mel Frequency Cepstral Coefficients
@@ -134,7 +131,7 @@ def plotMFCCs(signal):
     return plt
 
 
-def plotMelSpectrogram(signal):
+def plot_mel_spectrogram(signal):
     hop_length = 512
 
     S = librosa.feature.melspectrogram(y=signal, sr=SAMPLE_RATE, n_mels=128)
@@ -192,15 +189,15 @@ def plot_all(dataset_name):
     plt.subplot(3, 2, 1)
     plot_wave(signal)
     plt.subplot(3, 2, 2)
-    plotPowerSpectrum(signal)
+    plot_power_spectrum(signal)
     plt.subplot(3, 2, 3)
-    plotSpectrogram(signal)
+    plot_spec(signal)
     plt.subplot(3, 2, 4)
-    plotDBSpectrogram(signal)
+    plot_db_spectrogram(signal)
     plt.subplot(3, 2, 5)
-    plotMFCCs(signal)
+    plot_mfccs(signal)
     plt.subplot(3, 2, 6)
-    plotMelSpectrogram(signal)
+    plot_mel_spectrogram(signal)
     fig = pylab.gcf()
     fig.canvas.manager.set_window_title(f"class is: {sr}")
     plt.show()
@@ -262,7 +259,7 @@ def plot_results(result_list):
 
     for i in range(len(ax)):
         ax[i].set_xticks(range(0, EPOCHS, label_distance))
-        ax[i].set_xticklabels(range(1, EPOCHS + 1, label_distance))
+        ax[i].set_xticklabels(range(0, EPOCHS, label_distance))
         ax[i].set_xlabel("Epochs")
 
     ax[0].set_ylabel("Accuracy")
@@ -274,9 +271,9 @@ def plot_results(result_list):
     max_acc_value, max_acc_epoch = find_max_acc_epoch(result_list)
     max_acc_value = round(max_acc_value * 100, 2)
     ax[0].plot([res['avg_valid_acc'] for res in result_list], marker='o', color=colors[0])
-    ax[0].axvline(x=max_acc_epoch, linestyle='dotted', color='black')
-    ax[0].text(x=(max_acc_epoch + 0.1), y=0.2, s=f'Max Accuracy: {max_acc_value}', rotation=90, size='x-small')
     ax[0].set_ylim([0, 1])
+    ax[0].axvline(x=max_acc_epoch, linestyle='dotted', color='black')
+    ax[0].text(x=(max_acc_epoch + 0.1), y=0.2, s=f'Max Acc: {max_acc_value}', rotation=90, size='x-small')
     ax[1].plot([res['f1'] for res in result_list], marker='o', color=colors[1])
     ax[2].plot([res['avg_train_loss'] for res in result_list], marker='o', color=colors[3], label='Train Loss')
     ax[2].plot([res['avg_valid_loss'] for res in result_list], marker='^', color=colors[6], label='Valid Loss')
@@ -284,7 +281,7 @@ def plot_results(result_list):
     ax[3].plot([res['uar'] for res in result_list], marker='o', color='k')
     ax[4].plot([res['lr'] for res in result_list], marker='o', color='k')
 
-    plt.savefig('plotted_results.png', dpi=300, bbox_inches="tight")
+    plt.savefig('results/plotted_training_results.png', dpi=300, bbox_inches="tight")
 
 
 def tabulate_data(filepath):
@@ -296,23 +293,16 @@ def tabulate_data(filepath):
                  "kernelsize",
                  "stride", "AdamW wd"])
 
-    # iterate over data
     for i in range(0, len(data), 4):
         params, acc, uar, seed = data[i], data[i + 1], data[i + 2], data[i + 3]
         lr, rcc, rlf, dual_patchnorm, mixup, init_kernel_size, init_stride, weight_decay, ema, spec_aug, mask_prob, comment = params
 
-        # get the results values, add a new row to the DataFrame
         df.loc[i // 2] = [comment, acc, uar, seed, dual_patchnorm, rcc, rlf, mixup, spec_aug, init_kernel_size,
                           init_stride,
                           weight_decay]
-
-    # sort the rows based on the 'Avg Valid Acc' column
     df = df.sort_values(by=['Max acc'], ascending=False)
-
-    # Set option to display all columns
     pd.set_option('display.max_columns', None)
 
-    # print the table
     print(df)
 
 
@@ -323,6 +313,7 @@ def average10seeds():
         for file_name in files:
             if file_name.endswith('.json'):
                 file_path = os.path.join(subdir, file_name)
+                # print(file_path)
 
                 with open(file_path) as f:
                     data = json.load(f)
@@ -388,7 +379,7 @@ def bar_plot_averages(df, settings):
                     0]
             results[setting]['acc'].append(avg)
             minimum = avg - round(df[(df['Setting'] == setting) & (df['File Name'] == file_name)]['Minimum'].values[
-                                0] * 100, 1)
+                                      0] * 100, 1)
             maximum = round(df[(df['Setting'] == setting) & (df['File Name'] == file_name)]['Maximum'].values[
                                 0] * 100, 1) - avg
             results[setting]['min'].append(minimum)
@@ -396,7 +387,7 @@ def bar_plot_averages(df, settings):
             # print(results[setting])
 
     num_datasets = len(df['File Name'].unique())
-    barWidth = 0.8 / len(settings)
+    bar_width = 0.8 / len(settings)
 
     plt.figure(figsize=(10, 7))
     xpos = np.arange(num_datasets)
@@ -404,12 +395,12 @@ def bar_plot_averages(df, settings):
     for i, setting in enumerate(settings):
         yerr = [results[setting]['min'], results[setting]['max']]
         # print(results[setting]['acc'])
-        plt.bar(xpos + i * barWidth, results[setting]['acc'], color=sns.color_palette("colorblind")[i], width=barWidth,
-                label=setting.title(), yerr = yerr, capsize=5)
-        for w, (x, y) in enumerate(zip(xpos + i * barWidth, results[setting]['acc'])):
-            plt.text(x, y-results[setting]['min'][w]-3, str(round(y, 2)), ha='center', va='bottom')
+        plt.bar(xpos + i * bar_width, results[setting]['acc'], color=sns.color_palette("colorblind")[i], width=bar_width,
+                label=setting.title(), yerr=yerr, capsize=5)
+        for w, (x, y) in enumerate(zip(xpos + i * bar_width, results[setting]['acc'])):
+            plt.text(x, y - results[setting]['min'][w] - 3, str(round(y, 2)), ha='center', va='bottom', fontsize=7)
 
-    plt.xticks(xpos + barWidth * len(settings) / 2 - 0.08, df['File Name'].unique())
+    plt.xticks(xpos + bar_width * len(settings) / 2 - 0.08, df['File Name'].unique())
     plt.xlabel('Dataset')
     plt.ylabel('Accuracy/ UAR (%)')
     plt.legend(loc='lower right')

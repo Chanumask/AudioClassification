@@ -2,20 +2,17 @@ import json
 import logging
 import time
 
-import pandas as pd
 import tqdm
-from IPython.utils import io
 from colorlog import ColoredFormatter
 from itertools import product
 
-import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from x_metaformer import CAFormer
 import pytorch_lightning as pl
 from ema_pytorch import EMA
-import AudioUtil
+
 import plotting
 from dataset_classes.ESC50Dataset import *
 from dataset_classes.MusicDataset import *
@@ -75,8 +72,8 @@ def get_data(param_iteration):
         df = pd.read_csv(metadata_file)
         # print(df.head())
 
-        train_df = df[df['fold'] != 1]
-        valid_df = df[df['fold'] == 1]
+        train_df = df[df['fold'] != 5]
+        valid_df = df[df['fold'] == 5]
 
         train_data = ESC50Data("training", audio_path, train_df, 'filename', 'category', specaug=specaug,
                                mask_prob=param_iteration['mask_prob'][0])
@@ -86,7 +83,7 @@ def get_data(param_iteration):
     elif DATASET == "MUSIC":
         num_classes = 10
         x_train, y_train, categories = load_music_dataset(MUSIC_PATH_TRAIN)
-        x_valid, y_valid, _ = load_music_dataset(MUSIC_PATH_VALID)
+        x_valid, y_valid, _ = load_music_dataset(MUSIC_PATH_TEST)
         train_data = MusicDataset("training", x_train, y_train, categories, specaug=specaug,
                                   mask_prob=param_iteration['mask_prob'][0])
         valid_data = MusicDataset("validation", x_valid, y_valid, categories, specaug=False,
@@ -96,7 +93,7 @@ def get_data(param_iteration):
         num_classes = 5
 
         x_train, y_train, categories = load_primates_dataset(PRIMATES_CSV_TRAIN)
-        x_val, y_val, _ = load_primates_dataset(PRIMATES_CSV_VALID)
+        x_val, y_val, _ = load_primates_dataset(PRIMATES_CSV_TEST)
 
         train_data = PrimatesDataset("training", x_train, y_train, categories, specaug=specaug,
                                      mask_prob=param_iteration['mask_prob'][0])
@@ -190,7 +187,7 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
                 use_dual_patchnorm=combo[3],  # norm on both sides for the patch embedding
                 use_pos_emb=True,  # use 2d sinusodial positional embeddings
                 head_dim=32,
-                num_heads=4,
+                num_heads=combo[19],
                 attn_dropout=0.1,
                 proj_dropout=0.1,
                 patchmasking_prob=0,  # worse: 0.05 replace 5% of the initial tokens with a </mask> token
@@ -206,6 +203,9 @@ def train_with_hyperparams(hyperparams, classes_count, filepath, current_seed):
             )
             my_metaformer = my_metaformer.to(device)
         else:
+            with open(f'best_performance/highest_acc_{DATASET}', 'r+') as f:
+                current_max_acc = float(f.read())
+            log.info(f"Using the best model with accuracy/UAR of {current_max_acc}")
             my_metaformer = torch.load(f'best_performance/best_{DATASET}_model')
             # my_metaformer = torch.load(f'ensemble_models/SPEECH/300/seed6acc9750.pt')
             my_metaformer = my_metaformer.to(device)
@@ -360,6 +360,18 @@ def train(model, loss_fn, train_loader, val_loader, hyperparameters, iteration, 
                                {"Train Losses": ['avg_train_loss']},
                                {"Valid Losses": ['avg_valid_loss']},
                                {"Learning rates per batch": ['lr']}, {"Unweighted Average Recall": ['uar']}])
+        # if epoch == 80:
+        #     highest_uar = 0
+        #     highest_acc = 0
+        #     for epoch_res in res_array[:80]:
+        #         if epoch_res['avg_valid_acc'] > highest_acc:
+        #             highest_acc = epoch_res['avg_valid_acc']
+        #         if epoch_res['uar'] > highest_acc:
+        #             highest_uar = epoch_res['uar']
+        #
+        #     log.info(f"Highest accuracy of the first 80 epochs after 80 epochs: {highest_acc}")
+        #     log.info(f"Highest uar of the first 80 epochs after 80 epochs: {highest_uar}")
+
     seconds = (time.time() - start_time)
     minutes = int(seconds // 60)
     remaining_seconds = int(round(seconds % 60, 0))
@@ -372,45 +384,12 @@ def load_ensemble(models_dir):
     models = []
     for file_name in os.listdir(models_dir):
         if file_name.endswith(".pt"):
+            print(file_name)
             model_path = os.path.join(models_dir, file_name)
             loaded_model = torch.load(model_path)
             models.append(loaded_model)
     return models
 
-
-# def predict_ensemble(ensemble_models):
-#     pl.seed_everything(seed=1)
-#     training_data, validation_data, num_categories = get_data()
-#     training_loader, validation_loader = get_data_loaders(training_data, validation_data)
-#     label_array = None
-#     df_dict = {}
-#
-#     for c, model in enumerate(ensemble_models):
-#         # supress the seed log
-#         with io.capture_output() as captured:
-#             pl.seed_everything(seed=1)
-#
-#         model.eval()
-#         trace_y, trace_yhat = [], []
-#         with torch.no_grad():
-#             for j, data in enumerate(validation_loader):
-#                 x, y = data
-#                 x = x.to(device, dtype=torch.float32)
-#                 y = y.to(device, dtype=torch.long)
-#                 y_hat = model(x)
-#                 trace_y.append(y.cpu().detach().numpy())
-#                 trace_yhat.append(y_hat.cpu().detach().numpy())
-#             trace_y = np.concatenate(trace_y)
-#             trace_yhat = np.concatenate(trace_yhat)
-#             # accuracy = np.mean(np.argmax(trace_yhat, axis=1) == trace_y)
-#             prediction = np.argmax(trace_yhat, axis=1)
-#             pred_array = np.array(prediction)
-#             if label_array is None:
-#                 label_array = np.array(trace_y)
-#                 df_dict[f'label_{c}'] = label_array
-#             df_dict[f'pred_{c}'] = pred_array
-#     ensemble_df = pd.DataFrame(df_dict)
-#     return ensemble_df
 
 def predict_ensemble(ensemble_models):
     pl.seed_everything(seed=1)
@@ -430,7 +409,7 @@ def predict_ensemble(ensemble_models):
                 x, y = data
                 x = x.to(device, dtype=torch.float32)
                 y = y.to(device, dtype=torch.long)
-                y_hat = model(x)
+                y_hat = model(x).softmax(-1)
                 batch_yhat.append(y_hat.cpu().detach().numpy())
             batch_yhat = np.stack(batch_yhat, axis=1)
             soft_voting = batch_yhat.mean(1)
@@ -444,18 +423,6 @@ def predict_ensemble(ensemble_models):
     df_dict[f'predictions'] = predictions
     ensemble_df = pd.DataFrame(df_dict)
     return ensemble_df
-
-
-# def majority_vote(df):
-#     majority_preds = []
-#     for i, row in df.iterrows():
-#         label = row['label_0']
-#         predictions = row.drop('label_0')
-#         mode_pred = statistics.mode(predictions)
-#         majority_preds.append(mode_pred)
-#     df['majority_vote'] = majority_preds
-#     acc = (df['label_0'] == df['majority_vote']).sum() / len(df)
-#     return acc
 
 
 if __name__ == "__main__":
@@ -480,9 +447,9 @@ if __name__ == "__main__":
 
     if AVG_SEEDS:
         df = plotting.average10seeds()
-        # print(df[['Setting', 'File Name', 'Avg. Accuracy', 'Avg. improvement']])
-        print(df.loc[df['File Name'] == "ESC50", ['Setting', 'File Name', 'Avg. Accuracy', 'Avg. improvement']])
-        plotting.bar_plot_averages(df, BARPLOT_SETTING)
+        # print(df[['Setting', 'File Name', 'Avg. Accuracy', 'Maximum']])
+        print(df.loc[df['File Name'] == "MUSIC", ['Setting', 'Maximum', 'Avg. Accuracy']])
+        # plotting.bar_plot_averages(df, BARPLOT_SETTING)
         quit()
 
     dataset_hyperparameters = setup_parameters()
