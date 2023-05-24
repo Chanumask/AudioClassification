@@ -1,7 +1,7 @@
 # Model training
-DATASET = "PRIMATES"  # "SPEECH", "ESC50", "MUSIC", "PRIMATES"
+DATASET = "PRIMATES"  # "ESC50", "MUSIC", "PRIMATES"
 SAVE_DATA = True
-SAVE_PATH = "10seeds//new experiment"
+SAVE_PATH = "10seeds//test-split"
 SAVE_MAX_MODEL = True
 USE_MAX_MODEL = False
 SAVE_ENSEMBLE = False
@@ -12,22 +12,22 @@ PLOT_RES = True
 CONF_MATRIX = False
 MONITORING = False
 UPDATE_INTERVAL = 10  # every x Epochs
-AVG_SEEDS = False
-BARPLOT_SETTING = ["baseline", "random resize crop", "random linear fade", "mixup", "augmentations combined"]
+AVG_SEEDS = True
+# BARPLOT_SETTING = ["baseline", "random resize crop", "random linear fade", "mixup", "augmentations combined"]
 # BARPLOT_SETTING = ["baseline", "cosine annealing", "optimized adamW", "best augmentations", "augmentations and training loop"]
 # BARPLOT_SETTING = ["augmentations and training loop", "no sequential pooling", "4 attention heads"]
 # BARPLOT_SETTING = ["augmentations and training loop", "dual patchnorm", "batch normalization", "improve locality",
 #                    "l2 norm + trainable scale", "32 memory vectors", "grn mlp", "best configuration"]
 # BARPLOT_SETTING = ["baseline", "baseline with EMA", "best configuration", "best configuration, ema"]
-# BARPLOT_SETTING = ["best configuration", "best configuration 300"]
+BARPLOT_SETTING = ["best configuration", "best configuration 300"]
 
 MAJORITY_VOTE = False
 ONLY_TABULATE = False
 ONLY_PLOT_EXAMPLE = False
 
 # Training Loop
-BATCH_SIZE = 16  # 32, 64
-EPOCHS = 15
+BATCH_SIZE = 32  # 32, 64
+EPOCHS = 80
 LR_WARUMUP = True
 COSINE = True
 
@@ -112,21 +112,6 @@ HYPERPARAMS_MUSIC = [
         'comment': ["best configuration, no ema 300"],
     }
 ]
-
-HYPERPARAMS_SPEECH = {
-    'learning_rate': [1e-4],
-    'random resize crop': [False],
-    'random linear fade': [False],
-    'dual patchnorm': [False],
-    'mixup': [False],  # only 1 value possible atm
-    'init_kernel_size': [3],  # [(8, 4), (16, 8), (16, 4)],
-    'init_stride': [2],  # [(4, 2), (8, 4)],
-    'weight_decay': [1e-3],  # 1e-2
-    'seed': [2],
-    'ema': [False],
-    'spec_aug': [False],
-    'comment': [""]
-}
 
 # Dataset paths
 SPEECH_DATASET_PATH = "data/SpeechCommands"

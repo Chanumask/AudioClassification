@@ -448,8 +448,8 @@ if __name__ == "__main__":
     if AVG_SEEDS:
         df = plotting.average10seeds()
         # print(df[['Setting', 'File Name', 'Avg. Accuracy', 'Maximum']])
-        print(df.loc[df['File Name'] == "MUSIC", ['Setting', 'Maximum', 'Avg. Accuracy']])
-        # plotting.bar_plot_averages(df, BARPLOT_SETTING)
+        print(df.loc[df['File Name'] == DATASET, ['Setting', 'Maximum', 'Avg. Accuracy']])
+        plotting.bar_plot_averages(df, BARPLOT_SETTING)
         quit()
 
     dataset_hyperparameters = setup_parameters()

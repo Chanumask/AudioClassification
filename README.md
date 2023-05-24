@@ -1,30 +1,29 @@
 # Audio Classification Repository
 
+This repository contains tools and scripts for audio classification tasks. It provides a framework for training audio classification models and visualizing the results.
 ## Installation
 
 To clone the repository: 
 
 `git clone https://github.com/Chanumask/AudioClassification.git`
 
-Install the required dependencies. You can use pip to install them:
+Install the required dependencies using pip:
 
 `pip install -r requirements.txt`
 
-Make sure you have the necessary audio data and set the according dataset path variables in _settings.py_.
-
+Make sure you have the necessary audio data and set the corresponding dataset path variables in `settings.py` before proceeding.
 
 ## Model training
-In _settings.py_:
+To train an audio classification model, follow these steps:
 
-check the Dataset you want to use, and set its path
+1. Open `settings.py` and configure the dataset path, training loop, model parameters, and extensions.
 
-set Training Loop and Model parameters and extensions
+2. Execute `main.py` to start the training process.
 
-execute main.py
+3. The results will be printed and saved in a JSON file along with the corresponding model parameters.
 
 ## Displaying and plotting results
-In _settings.py_:
+To display and plot the training results, make the following changes in `settings.py`:
 
-Use `MONITORING` and `UPDATE_INTERVAL` to monitor training or only plot the final training metrics using `PLOT_RES`
-
-`AVG_SEEDS` will return a table of the results accumulating the different seeds for each run and plotting the experiments listed in `BARPLOT_SETTING`
+- Set `MONITORING` and `UPDATE_INTERVAL` to monitor training progress or only plot the final training metrics using `PLOT_RES`.
+- Adjust the `AVG_SEEDS` parameter to accumulate results for different seeds and plot the experiments listed in `BARPLOT_SETTING`.
